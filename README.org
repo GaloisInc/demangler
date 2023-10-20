@@ -1,5 +1,4 @@
-Demangler
-=========
+* Demangler
 
 This is a demangler for "mangled" source code names.  A "mangled" name is an
 encoded form of a function or other symbol that includes additional information
@@ -8,7 +7,41 @@ result is smaller and is entirely comprised of characters that are valiod for a
 simple identifier (alphanumeric characters and underscores).
 
 C++ is the pre-emininent source of mangled names, although other languages
-perform mangling as well.  C++ mangling is a twisted and ill-documented process,
+perform mangling as well.
+
+Normal usage of this library will return the original demangled form if the
+demangling fails (usually because of incompleteness in this parser).  There are
+occasional scenarios where the conversion to the string format is incomplete:
+these will generate obviously bad output... let us know what the right output is
+and we'll fix it!
+
+** Details
+
+*** General Implementation
+
+This library is intended to be used when processing compiled code that contains
+mangled names (e.g. LLVM bitcode, ELF symbol tables, etc.).  When processing
+compiled code, it is not uncommon to encounter upwards of 10-15 thousand mangled
+symbols, all of which may need to be demangled.  To support the primary goals of
+performance and tight memory footprint, this library uses a ~Context~ that is
+essentially a state threaded through the demangling process to normalize
+(i.e. use sharing) textual information.  There are two primary entry points: one
+that demangles a single string and internally creates and discards a ~Context~
+for that single demangling, and one that allows the re-use of a ~Context~, which
+is updated as each name is demangled.
+
+The demangling process is designed to never fail or throw exceptions: if a name
+cannot be demangled it is assumed to be an unmangled name (or garbage) and the
+original, unmangled form is returned. It is also possible to build this library
+with the debug flag enabled (~$ cabal configure -fdebug~).  In the debug mode,
+the library will panic on unrecognized parse scenarios or unimplemented string
+output forms.  The panic provides additional information to help fix this issue,
+but is obviously a sub-optimal result for production code, so please only use the
+debug mode in appropriate scenarios.
+
+*** C++
+
+C++ mangling is a twisted and ill-documented process,
 primarily documented at
 https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling).  There are lots of
 special considerations (e.g. expressions can be template arguments that must be
@@ -18,40 +51,16 @@ characters).  This library is NOT YET a complete implementation: there are
 mangled forms that are not correctly parsed and/or printed; expect updates as
 these are encountered and needed (and patches are welcome).
 
-Normal usage of this library will return the original demangled form if the
-demangling fails (usually because of incompleteness in this parser).  There are
-occasional scenarios where the conversion to the string format is incomplete:
-these will generate obviously bad output... let us know what the right output is
-and we'll fix it!
-
-It is also possible to build this library with the debug flag enabled (~$ cabal
-configure -fdebug~).  In the debug mode, the library will panic on unrecognized
-parse scenarios or unimplemented string output forms.  The panic provides
-additional information to help fix this issue, but is obviously a sub-optimal
-result for production code, so please only use the debug mode in appropriate
-scenarios.
+** Other options
 
 This is not the only Haskell demangler library; there is at least one other one
 that is build on the Boomerang parsing library, which has the advantage in that
 it is bi-directional, but the disadvantage that it is slow and uses considerably
 more memory.  These disadvantages become very significant when processing source
 code that contains 10K-15K+ mangled names, ergo this library is *not*
-bi-directional but it is oriented towards performance and memory utilization.
+bi-directional but it *is* oriented towards performance and memory utilization.
 
-To support these goals, this library uses a ~Context~ that is essentially a state
-threaded through the demangling process to normalize (i.e. use sharing) textual
-information.  There are two primary entry points: one that demangles a single
-string and internally creates and discards a ~Context~ for that single
-demangling, and one that allows the re-use of a ~Context~, which is updated as
-each name is demangled.
-
-The output of the demangling process is an AST that represents the name in a
-semantically rich (but messy) manner.  The "sayable" library
-(https://hackage.haskell.org/package/sayable) is used convert this AST to an
-actual rich string representation: there is a ~Sayable~ instance for each
-~(AST_object, Context)~ tuple.  The instances defined support the ~"diagnostic"~
-saytag for obtaining some additional information during output; normally the
-~"normal"~ saytag should be used.
+** Usage
 
 This is available as a library that can be used by other applications to demangle
 code, and also provides a `demangle` application that is the equivalent of the
@@ -62,11 +71,19 @@ standard input.
 $ cabal run demangle _Znwm
 #+end_example
 
-As a library:
+The output of the demangling function(s) is an AST that represents the name in a
+semantically rich (but messy) manner.  The "sayable" library
+(https://hackage.haskell.org/package/sayable) is used convert this AST to an
+actual rich string representation: there is a ~Sayable~ instance for each
+~(AST_object, Context)~ tuple.  The instances defined support the ~"diagnostic"~
+saytag for obtaining some additional information during output; normally the
+~"normal"~ saytag should be used.
 
 #+begin_example
 putStrLn $ sez_ @"normal" $ demangle1 "_Znwm"
 #+end_example
 
-Please use the issue tracker to notify us of any issues.
+** Bugs
 
+Please use the issue tracker to notify us of any issues.  There are certain to be
+some.
