@@ -1,0 +1,72 @@
+{
+  "nodes": {
+    "levers": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1687557470,
+        "narHash": "sha256-T0TAGZPiI5cwWR2OMLVYW7aj3Aco7v8qIVF7JoEgO9Y=",
+        "owner": "kquick",
+        "repo": "nix-levers",
+        "rev": "0e31d80978a9fb6a96df0722aa298d008a57c53e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kquick",
+        "repo": "nix-levers",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1685566663,
+        "narHash": "sha256-btHN1czJ6rzteeCuE/PNrdssqYD2nIA4w48miQAFloM=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "4ecab3273592f27479a583fb6d975d4aba3486fe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "23.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "levers": "levers",
+        "nixpkgs": "nixpkgs",
+        "sayable": "sayable"
+      }
+    },
+    "sayable": {
+      "inputs": {
+        "levers": [
+          "levers"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1697668036,
+        "narHash": "sha256-5uF2URh0Rn6A5EHfKLZoE1rBEzWhiQvwTrcGLKzTeVU=",
+        "owner": "kquick",
+        "repo": "sayable",
+        "rev": "a7e2623a309fcc46d806a6e4f9b8fdf863486196",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kquick",
+        "repo": "sayable",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

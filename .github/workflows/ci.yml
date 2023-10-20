@@ -1,0 +1,42 @@
+name: demangler CI
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ghc-version: [ "ghc96", "ghc94", "ghc92", "ghc810", "ghc88" ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v20
+        with:
+          nix_path: nixpkgs=channel:nixos-23.05
+      - name: build ${{ matrix.ghc-version }}
+        shell: bash
+        run: nix build .#demangler.${{ matrix.ghc-version }}
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v20
+        with:
+          nix_path: nixpkgs=channel:nixos-23.05
+      - name: test
+        shell: bash
+        run: nix build .#TESTS
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v20
+        with:
+          nix_path: nixpkgs=channel:nixos-23.05
+      - name: doc
+        shell: bash
+        run: nix build .#DOC
