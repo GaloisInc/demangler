@@ -54,7 +54,7 @@ these are encountered and needed (and patches are welcome).
 ** Other options
 
 This is not the only Haskell demangler library; there is at least one other one
-that is build on the Boomerang parsing library, which has the advantage in that
+that is built on the Boomerang parsing library, which has the advantage in that
 it is bi-directional, but the disadvantage that it is slow and uses considerably
 more memory.  These disadvantages become very significant when processing source
 code that contains 10K-15K+ mangled names, ergo this library is *not*
@@ -63,8 +63,8 @@ bi-directional but it *is* oriented towards performance and memory utilization.
 ** Usage
 
 This is available as a library that can be used by other applications to demangle
-code, and also provides a `demangle` application that is the equivalent of the
-`c++-filt` application to demangle names provided on the command line or as
+code, and also provides a ~demangle~ application that is the equivalent of the
+~c++-filt~ application to demangle names provided on the command line or as
 standard input.
 
 #+begin_example
