@@ -17,6 +17,10 @@ jobs:
       - uses: cachix/install-nix-action@v20
         with:
           nix_path: nixpkgs=channel:nixos-23.05
+      - uses: cachix/cachix-action@v10
+        with:
+          name: galois
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: build ${{ matrix.ghc-version }}
         shell: bash
         run: nix build .#demangler.${{ matrix.ghc-version }}
@@ -27,6 +31,10 @@ jobs:
       - uses: cachix/install-nix-action@v20
         with:
           nix_path: nixpkgs=channel:nixos-23.05
+      - uses: cachix/cachix-action@v10
+        with:
+          name: galois
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: test
         shell: bash
         run: nix build .#TESTS
@@ -37,6 +45,10 @@ jobs:
       - uses: cachix/install-nix-action@v20
         with:
           nix_path: nixpkgs=channel:nixos-23.05
+      - uses: cachix/cachix-action@v10
+        with:
+          name: galois
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: doc
         shell: bash
         run: nix build .#DOC
