@@ -328,14 +328,29 @@ closure_prefix :: AnyNext ClosurePrefix
 closure_prefix = tbd "closure prefix"
 
 unqualified_name :: AnyNext UnqualifiedName
-unqualified_name = asum' [ \i -> do op <- operator_name i
-                                    at <- many' abi_tag $ rdiscard op
-                                    ret at $ OperatorName (op ^. nVal) (at ^. nVal)
-                         , ctor_dtor_name >=> rmap CtorDtorName
-                         , source_name
-                         , unnamed_type_name
-                           -- , match "DC" i >>= some source_name >>= match "E"
-                         ]
+unqualified_name =
+  asum' [ -- (see parseUnqualifiedName in LLVM ItaniumDemangle.h)
+          many' module_name . rdiscard >=> match "L" >&=> base_uqn
+          >=> rmap (uncurry ModuleNamed)
+        , base_uqn
+        ]
+
+
+base_uqn :: AnyNext UnqualifiedName
+base_uqn = asum' [ \i -> do op <- operator_name i
+                            at <- many' abi_tag $ rdiscard op
+                            ret at $ OperatorName (op ^. nVal) (at ^. nVal)
+                 , ctor_dtor_name >=> rmap CtorDtorName
+                 , source_name
+                 , unnamed_type_name
+                   -- , match "DC" i >>= some source_name >>= match "E"
+                 ]
+
+module_name :: AnyNext ModuleName
+module_name = match "W"
+              >=> asum' [ match "P" >=> source_name >=> rmap (ModuleName True)
+                        , source_name >=> rmap (ModuleName False)
+                        ]
 
 operator_name :: AnyNext Operator
 operator_name =

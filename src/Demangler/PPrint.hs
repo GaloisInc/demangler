@@ -183,6 +183,7 @@ instance {-# OVERLAPPABLE #-}
         (op, c) &- t'"[[gnu::abi_tag (" &+ ctxLst tags c &+ t'")]]"
       CtorDtorName cd -> sayable @saytag (cd, c)
       StdSubst subs -> sayable @saytag (subs, c)
+      ModuleNamed mn uqn -> ctxLst' mn c "" &+ (uqn,c)
 
 instance {-# OVERLAPPABLE #-}
   ( Sayable saytag (Operator, Context)
@@ -193,6 +194,14 @@ instance {-# OVERLAPPABLE #-}
     case n of
       CtorDtorName cd -> sayable @saytag (p, cd, c)
       _ -> sayable @saytag (n, c)
+
+instance {-# OVERLAPPABLE #-}
+  ( Sayable saytag (UnqualifiedName, Context)
+  ) => Sayable saytag (ModuleName, Context) where
+  sayable (ModuleName isP sn, c) =
+    if isP
+    then (sn,c) &+ ':'
+    else (sn,c) &+ '.'
 
 {- | Use Sayable (Prefix, CtorDtor, Context) instead, since CtorDtor needs to
    reproduce Prefix name. -}

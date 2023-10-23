@@ -55,11 +55,17 @@ type FunctionScope = Coord
 type FunctionEntity = Coord
 type Discriminator = Coord
 
+data ModuleName = ModuleName IsPartition UnqualifiedName -- KWQ: just a SourceName
+  deriving (Eq, Show)
+
+type IsPartition = Bool
+
 data UnqualifiedName = SourceName Coord
                      | OperatorName Operator [ABI_Tag]
                      | CtorDtorName CtorDtor
                      | StdSubst Substitution
-                      --  | UnnamedTypeName ...
+                     | ModuleNamed [ModuleName] UnqualifiedName
+                      --  | UnnamedTypeName ...  starts with "U"
                      --  | StructuredBinding ...
   deriving (Eq, Show)
 
