@@ -462,6 +462,7 @@ instance {-# OVERLAPPABLE #-}
 
 instance {-# OVERLAPPABLE #-}
   ( Sayable saytag (BaseType, Context)
+  , Sayable saytag (ArrayBound, Context)
   , Sayable saytag (Name, Context)
   , Sayable saytag (CVQualifier, Context)
   , Sayable saytag (ExtendedQualifier, Context)
@@ -481,11 +482,14 @@ instance {-# OVERLAPPABLE #-}
       Enum n -> sayable @saytag (n,c)
       Function {} -> sayFunctionType ty "" c
       Pointer f@(Function {}) -> sayFunctionType f "(*)" c
+      Pointer (ArrayType bnd t) -> (t,c) &- t'"(*)" &- '[' &+ (bnd,c) &+ ']'
       Pointer t -> (t,c) &+ '*'
+      LValRef (ArrayType bnd t) -> (t,c) &- t'"(&)" &- '[' &+ (bnd,c) &+ ']'
       LValRef t -> (t,c) &+ '&'
       RValRef t -> (t,c) &+ t'"&&"
       ComplexPair t -> (t,c) &- t'"complex"
       Imaginary t -> (t,c) &- t'"imaginary"
+      ArrayType bnd t -> (t,c) &+ '[' &+ (bnd,c) &+ ']'
       Template tp ta -> (tp,c) &- (ta,c) -- ??
       Cpp11PackExpansion ts ->
         -- XXX expected some "..." (see
@@ -510,6 +514,16 @@ sayFunctionType (Function cvqs mb'exc trns isExternC rTy argTys mb'ref) nm c =
   &? ((,c) <$> mb'ref)
 sayFunctionType _ _ _ = cannotSay Demangler "sayFunctionType"
                         [ "Called with a type that is not a Function!" ]
+
+
+instance {-# OVERLAPPABLE #-}
+  ( Sayable saytag (Expression, Context)
+  ) => Sayable saytag (ArrayBound, Context) where
+  sayable (n, c) =
+    case n of
+      NoBounds -> sayable @saytag $ t'""
+      NumBound i -> sayable @saytag i
+      ExprBound e -> sayable @saytag (e,c)
 
 
 instance {-# OVERLAPPABLE #-}

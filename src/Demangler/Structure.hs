@@ -185,6 +185,12 @@ data Type_ = BaseType BaseType
            | Imaginary Type_
            | Cpp11PackExpansion (NonEmpty Type_)
            | StdType StdType
+           | ArrayType ArrayBound Type_
+  deriving (Eq, Show)
+
+data ArrayBound = NumBound Int
+                | ExprBound Expression
+                | NoBounds
   deriving (Eq, Show)
 
 data ExceptionSpec = NonThrowing

@@ -484,7 +484,7 @@ type_parser =
         , asum' [ qualified_type
                 , function_type
                 , class_enum_type
-                  -- , array_type
+                , array_type
                   -- , pointer_to_member_type
                 , template_template_param >&=> template_args
                   >=> rmap (uncurry Template)
@@ -595,6 +595,15 @@ class_enum_type = asum' [ rmap ClassUnionStructEnum <=< name
                         , match "Tu" >=> rmap Union <=< name
                         , match "Te" >=> rmap Enum <=< name
                         ]
+
+array_type :: AnyNext Type_
+array_type = match "A"
+             >=> asum' [ match "_" >=> type_ >=> rmap (ArrayType NoBounds)
+                       , digits_num >=> match "_" >&=> type_
+                         >=> rmap (uncurry (ArrayType . NumBound))
+                       , expression >=> match "_" >&=> type_
+                         >=> rmap (uncurry (ArrayType . ExprBound))
+                       ]
 
 function_encoding :: AnyNext FunctionScope
 function_encoding = tbd "function_encoding"
