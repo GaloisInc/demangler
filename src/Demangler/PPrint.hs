@@ -1,15 +1,19 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-- OPTIONS_GHC -ddump-splices #-}
 
 module Demangler.PPrint () where
 
@@ -26,7 +30,7 @@ import           Demangler.Structure
 
 
 #ifdef MIN_VERSION_panic
-import Panic
+import           Panic
 
 -- Debug function to cause a Panic with -fdebug builds, or return a placeholder
 -- in non-debug mode.  This is usually used for unfinished portions of the
@@ -45,37 +49,55 @@ cannotSay _ _ rsn = t'"OUTFMT?:{ " &* rsn &- '}'
 #endif
 
 
+data PrefixUQN = PUC Prefix UnqualifiedName
+data PrefixCDtor = PCDC Prefix CtorDtor
+
+$(return [])
+
+ctxLst :: forall saytag t a .
+          Sayable saytag (WithContext a)
+       => Functor t
+       => Foldable t
+       => t a -> Context -> Saying saytag
+ctxLst l c = t'"" &+* wCtx l c
+
+ctxLst' :: Sayable saytag (WithContext a)
+        => Functor t
+        => Foldable t
+        => t a -> Context -> Text -> Saying saytag
+ctxLst' l c sep = sep &:* wCtx l c
+
+wCtx :: Functor t => t a -> Context -> t (WithContext a)
+wCtx a c = (\b -> WC b c) <$> a
+
+
 ----------------------------------------------------------------------
 -- Sayable instances for printing demangled results
 
 instance {-# OVERLAPPING #-}
-  ( Sayable "diagnostic" (Encoding, Context)
+  ( Sayable "diagnostic" (WithContext Encoding)
   ) => Sayable "diagnostic" Result where
   sayable = \case
     (Original i, c) -> contextStr c i &- t'"{orig}"
-    (Encoded e, c) -> sayable @"diagnostic" (e,c)
+    (Encoded e, c) -> sayable @"diagnostic" $ WC e c
     (VendorExtended d i, c) ->
       let (s1,s2) = T.span isAlphaNum $ contextStr c i
-      in (d,c) &- t'"[clone" &- s1 &+ ']' &+ s2
+      in WC d c &- t'"[clone" &- s1 &+ ']' &+ s2
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Encoding, Context)
+  ( Sayable saytag (WithContext Encoding)
   ) => Sayable saytag Result where
   sayable = \case
     (Original i, c) -> sayable @saytag $ contextStr c i
-    (Encoded e, c) -> sayable @saytag (e,c)
+    (Encoded e, c) -> sayable @saytag $ WC e c
     (VendorExtended d i, c) ->
       let (s1,s2) = T.span isAlphaNum $ contextStr c i
-      in (d,c) &- t'"[clone" &- '.' &+ s1 &+ ']' &+ s2
+      in WC d c &- t'"[clone" &- '.' &+ s1 &+ ']' &+ s2
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Name, Context)
-  , Sayable saytag (Type_, Context)
-  , Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (SpecialName, Context)
-  , Sayable saytag (CVQualifier, Context)
-  ) => Sayable saytag (Encoding, Context) where
-  sayable (n,c) =
+  $(sayableConstraints ''Encoding
+  ) => Sayable saytag (WithContext Encoding) where
+  sayable (WC n c) =
     case n of
       -- Note: if the function has only a single void argument, print "()"
       -- instead of "(void)"; these are semantically the same, but demangling
@@ -90,31 +112,27 @@ instance {-# OVERLAPPABLE #-}
       -- form.
       EncStaticFunc f rty (BaseType Void :| []) -> sayFunction c f rty []
       EncStaticFunc f rty t -> sayFunction c f rty $ NEL.toList t
-      EncConstStructData nm -> sayable @saytag (nm,c)
-      EncData nm -> sayable @saytag (nm,c)
-      EncSpecial sn -> sayable @saytag (sn,c)
+      EncConstStructData nm -> sayable @saytag $ WC nm c
+      EncData nm -> sayable @saytag $ WC nm c
+      EncSpecial sn -> sayable @saytag $ WC sn c
 
-sayFunction :: Context -> FunctionName -> Maybe Type_ -> [Type_] -> Saying saytag
+sayFunction :: Sayable saytag (WithContext Type_)
+            => Context -> FunctionName -> Maybe Type_ -> [Type_] -> Saying saytag
 sayFunction c fn mbRet args =
   let (nm,q) = cleanFunctionName fn
       part1 = case mbRet of
-                Nothing -> (nm,c) &+ t'""
-                Just rty -> (rty, c) &- (nm,c)
-      part2 = part1 &+ '(' &+* zip args (repeat c) &+ ')'
+                Nothing -> WC nm c &+ t'""
+                Just rty -> WC rty c &- WC nm c
+      part2 = part1 &+ '(' &+ ctxLst args c &+ ')'
   in if null q then part2 else part2 &- ctxLst' q c " "
 
-ctxLst :: forall saytag t a .
-          Sayable saytag (a, Context)
-       => Functor t
-       => Foldable t
-       => t a -> Context -> Saying saytag
-ctxLst l c = t'"" &+* ((,c) <$> l)
+instance Sayable saytag (WithContext a)
+  => Sayable saytag (NonEmpty (WithContext a)) where
+  sayable l = t'"" &+* l
 
-ctxLst' :: Sayable saytag (a, Context)
-        => Functor t
-        => Foldable t
-        => t a -> Context -> Text -> Saying saytag
-ctxLst' l c sep = sep &:* ((,c) <$> l)
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext a)
+  => Sayable saytag (WithContext (NonEmpty a)) where
+  sayable (WC l c) = ctxLst l c
 
 cleanFunctionName :: FunctionName -> (Name, [CVQualifier])
 cleanFunctionName (FunctionName nm) =
@@ -126,107 +144,99 @@ cleanFunctionName (FunctionName nm) =
     _ -> (nm, [])
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  , Sayable saytag (Encoding, Context)
-  -- , Sayable saytag (CallOffset, Context)
-  ) => Sayable saytag (SpecialName, Context) where
-  sayable (n, c) =
+  $(sayableConstraints ''SpecialName
+  ) => Sayable saytag (WithContext SpecialName) where
+  sayable (WC n c) =
     case n of
-      VirtualTable ty -> t'"vtable for" &- (ty,c)
-      TemplateParameterObj ta -> t'"template parameter object for" &- (ta,c)
-      VTT ty -> t'"VTT for" &- (ty,c)
-      TypeInfo ty -> t'"typeinfo for" &- (ty,c)
-      TypeInfoName ty -> t'"typeinfo name for" &- (ty,c)
+      VirtualTable ty -> t'"vtable for" &- WC ty c
+      TemplateParameterObj ta -> t'"template parameter object for" &- WC ta c
+      VTT ty -> t'"VTT for" &- WC ty c
+      TypeInfo ty -> t'"typeinfo for" &- WC ty c
+      TypeInfoName ty -> t'"typeinfo name for" &- WC ty c
       CtorVTable _ -> t'"construction vtable for" &- t'"()"
-      Thunk (VirtualOffset _o1 _o2) enc -> t'"virtual thunk to" &- (enc,c)
-      Thunk (NonVirtualOffset _o1) enc -> t'"non-virtual thunk to" &- (enc,c)
+      Thunk (VirtualOffset _o1 _o2) enc -> t'"virtual thunk to" &- WC enc c
+      Thunk (NonVirtualOffset _o1) enc -> t'"non-virtual thunk to" &- WC enc c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Name, Context)
-  ) => Sayable saytag (FunctionName, Context) where
-  sayable (FunctionName n, c) = sayable @saytag (n, c)
+  $(sayableConstraints ''FunctionName
+  ) => Sayable saytag (WithContext FunctionName) where
+  sayable (WC n c) = sayable @saytag $ WC n c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (NestedName, Context)
-  , Sayable saytag (TemplateArgs, Context)
-  , Sayable saytag (FunctionScope, Context)
-  , Sayable saytag (FunctionEntity, Context)
-  , Sayable saytag (Discriminator, Context)
-  ) => Sayable saytag (Name, Context) where
-  sayable (n, c) =
+  $(sayableConstraints ''Name
+  ) => Sayable saytag (WithContext Name) where
+  sayable (WC n c) =
     case n of
-      NameNested nn -> sayable @saytag (nn,c)
-      UnscopedName False uqn -> sayable @saytag (uqn,c)
-      UnscopedName True uqn -> t'"std::" &+ (uqn,c)
-      UnscopedTemplateName nn ta -> (nn,c) &+ (ta,c)
-      LocalName fs fe mbd -> (fs,c) &+ t'"::" &+ (fe,c) &? ((,c) <$> mbd) -- ??
-      StringLitName fs mbd -> (fs,c) &? ((,c) <$> mbd) -- ??
+      NameNested nn -> sayable @saytag $ WC nn c
+      UnscopedName False uqn -> sayable @saytag $ WC uqn c
+      UnscopedName True uqn -> t'"std::" &+ WC uqn c
+      UnscopedTemplateName nn ta -> WC nn c &+ WC ta c
+      LocalName fs fe mbd -> WC fs c  &+ t'"::" &+ WC fe c &? wCtx mbd c -- ??
+      StringLitName fs mbd -> WC fs c &? wCtx mbd c -- ??
 
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (Coord, Context) where
-  sayable (i, c) = sayable @saytag $ contextStr c i
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext Coord) where
+  sayable (WC i c) = sayable @saytag $ contextStr c i
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Operator, Context)
-  , Sayable saytag (ABI_Tag, Context)
-  , Sayable saytag (CtorDtor, Context)
-  , Sayable saytag (SourceName, Context)
-  ) =>  Sayable saytag (UnqualifiedName, Context) where
-  sayable (n, c) =
+  $(sayableConstraints ''UnqualifiedName
+  ) =>  Sayable saytag (WithContext UnqualifiedName) where
+  sayable (WC n c) =
     case n of
-      SourceName i [] -> sayable @saytag (i,c)
-      SourceName i tags -> sayable @saytag (i,c) &+ ctxLst' tags c ""
-      OperatorName op [] -> sayable @saytag (op, c)
-      OperatorName op tags -> sayable @saytag (op, c) &+ ctxLst' tags c ""
-      CtorDtorName cd -> sayable @saytag (cd, c)
-      StdSubst subs -> sayable @saytag (subs, c)
-      ModuleNamed mn uqn -> ctxLst' mn c "" &+ (uqn,c)
-
-instance {-# OVERLAPPABLE #-} Sayable saytag (SourceName, Context) where
-  sayable (SrcName i, c) = sayable @saytag $ contextStr c i
+      SourceName i [] -> sayable @saytag $ WC i c
+      SourceName i tags -> WC i c &+ ctxLst' tags c ""
+      OperatorName op [] -> sayable @saytag $ WC op c
+      OperatorName op tags -> WC op c &+ ctxLst' tags c ""
+      CtorDtorName cd -> sayable @saytag $ WC cd c
+      StdSubst subs -> sayable @saytag $ WC subs c
+      ModuleNamed mn uqn -> ctxLst' mn c "" &+ WC uqn c
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Operator, Context)
-  , Sayable saytag (ABI_Tag, Context)
-  , Sayable saytag (CtorDtor, Context)
-  ) =>  Sayable saytag (Prefix, UnqualifiedName, Context) where
-  sayable (p, n, c) =
+  $(sayableConstraints ''SourceName
+   ) => Sayable saytag (WithContext SourceName) where
+  sayable (WC (SrcName i) c) = sayable @saytag $ contextStr c i
+
+
+instance {-# OVERLAPPABLE #-}
+  ($(sayableConstraints ''PrefixUQN)
+  , Sayable saytag (WithContext PrefixCDtor)
+  ) =>  Sayable saytag (WithContext PrefixUQN) where
+  sayable (WC (PUC p n) c) =
     case n of
-      CtorDtorName cd -> sayable @saytag (p, cd, c)
-      _ -> sayable @saytag (n, c)
+      CtorDtorName cd -> sayable @saytag $ WC (PCDC p cd) c
+      _ -> sayable @saytag $ WC n c
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
-  ) => Sayable saytag (ModuleName, Context) where
-  sayable (ModuleName isP sn, c) =
+  $(sayableConstraints ''ModuleName
+  ) => Sayable saytag (WithContext ModuleName) where
+  sayable (WC (ModuleName isP sn) c) =
     if isP
-    then (sn,c) &+ ':'
-    else (sn,c) &+ '.'
+    then WC sn c &+ ':'
+    else WC sn c &+ '.'
 
 {- | Use Sayable (Prefix, CtorDtor, Context) instead, since CtorDtor needs to
    reproduce Prefix name. -}
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  ) =>  Sayable saytag (CtorDtor, Context) where
-  sayable (n, c) =
+  $(sayableConstraints ''CtorDtor
+   ) =>  Sayable saytag (WithContext CtorDtor) where
+  sayable (WC n c) =
     case n of
       CompleteCtor -> 'c' &+ '1'
       BaseCtor -> 'c' &+ '2'
       CompleteAllocatingCtor -> 'c' &+ '3'
-      CompleteInheritingCtor t -> t'"ci1" &+ (t,c)
-      BaseInheritingCtor t -> t'"ci2" &+ (t,c)
+      CompleteInheritingCtor t -> t'"ci1" &+ WC t c
+      BaseInheritingCtor t -> t'"ci2" &+ WC t c
       DeletingDtor -> 'd' &+ '0'
       CompleteDtor -> 'd' &+ '1'
       BaseDtor -> 'd' &+ '2'
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  ) =>  Sayable saytag (Prefix, CtorDtor, Context) where
-  sayable (p, n, c) =
+  $(sayableConstraints ''PrefixCDtor
+  ) =>  Sayable saytag (WithContext PrefixCDtor) where
+  sayable (WC (PCDC p n) c) =
     let mb'ln = case p of
                   Prefix pfxr -> pfxrLastUQName pfxr
                   _ -> cannot Demangler "sayable"
@@ -240,107 +250,97 @@ instance {-# OVERLAPPABLE #-}
     in case mb'ln of
          Just ln ->
            case n of
-             CompleteCtor -> sayable @saytag (ln,c)
-             BaseCtor -> sayable @saytag (ln,c)
-             CompleteAllocatingCtor -> sayable @saytag (ln,c)
-             CompleteInheritingCtor t -> sayable @saytag (t,c) -- ??
-             BaseInheritingCtor t -> sayable @saytag (t,c) -- ??
-             DeletingDtor -> '~' &+ (ln,c)
-             CompleteDtor -> '~' &+ (ln,c)
-             BaseDtor -> '~' &+ (ln,c)
-         Nothing -> t'"unk_" &+ sayable @saytag (n, c) -- unlikely... and will be wrong
+             CompleteCtor -> sayable @saytag $ WC ln c
+             BaseCtor -> sayable @saytag $ WC ln c
+             CompleteAllocatingCtor -> sayable @saytag $ WC ln c
+             CompleteInheritingCtor t -> sayable @saytag $ WC t c -- ??
+             BaseInheritingCtor t -> sayable @saytag $ WC t c -- ??
+             DeletingDtor -> '~' &+ WC ln c
+             CompleteDtor -> '~' &+ WC ln c
+             BaseDtor -> '~' &+ WC ln c
+         Nothing -> t'"unk_" &+ WC n c -- unlikely... and will be wrong
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (SourceName, Context)
-  , Sayable saytag (Type_, Context)
-  ) =>  Sayable saytag (Operator, Context) where
-  sayable (op, c) =
+  $(sayableConstraints ''Operator
+  ) =>  Sayable saytag (WithContext Operator) where
+  sayable (WC op c) =
     case lookup op opTable of
       Just (_, o) -> t'"operator" &+ o
       Nothing ->
         case op of
-          OpCast ty -> t'"operator" &- (ty, c)
-          OpString snm -> sayable @saytag (snm, c)
-          OpVendor n snm -> t'"vendor" &- n &- (snm, c)
+          OpCast ty -> t'"operator" &- WC ty c
+          OpString snm -> sayable @saytag $ WC snm c
+          OpVendor n snm -> t'"vendor" &- n &- WC snm c
           _ -> cannotSay Demangler "sayable"
                [ "Operator not in opTable or with a specific override:"
                , show op
                ]
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Prefix, Context)
-  , Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (CVQualifier, Context)
-  , Sayable saytag (RefQualifier, Context)
-  , Sayable saytag (TemplatePrefix, Context)
-  , Sayable saytag (TemplateArgs, Context)
-  ) => Sayable saytag (NestedName, Context) where
-  sayable (n, c) =
-    let qualrefs q r = ctxLst' q c " " &? ((,c) <$> r)
+  ($(sayableConstraints ''NestedName)
+  , Sayable saytag (WithContext PrefixCDtor)
+  ) => Sayable saytag (WithContext NestedName) where
+  sayable (WC n c) =
+    let qualrefs q r = ctxLst' q c " " &? wCtx r c
     in case n of
       NestedName p (CtorDtorName nm) q r ->
-        qualrefs q r &+ (p,c) &+ t'"::" &+ (p,nm,c)
-      NestedName EmptyPrefix nm q r -> qualrefs q r &+ (nm,c)
-      NestedName p nm q r -> qualrefs q r &+ (p,c) &+ t'"::" &+ (nm,c)
-      NestedTemplateName tp ta q r -> qualrefs q r &+ (tp,c) &+ (ta,c)
+        qualrefs q r &+ WC p c &+ t'"::" &+ WC (PCDC p nm) c
+      NestedName EmptyPrefix nm q r -> qualrefs q r &+ WC nm c
+      NestedName p nm q r -> qualrefs q r &+ WC p c &+ t'"::" &+ WC nm c
+      NestedTemplateName tp ta q r -> qualrefs q r &+ WC tp c &+ WC ta c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (ClosurePrefix, Context)
-  , Sayable saytag (TemplateParam, Context)
-  , Sayable saytag (DeclType, Context)
-  , Sayable saytag (PrefixR, Context)
-  ) => Sayable saytag (Prefix, Context) where
-  sayable (p, c) =
+  $(sayableConstraints ''Prefix
+  ) => Sayable saytag (WithContext Prefix) where
+  sayable (WC p c) =
     case p of
-      PrefixTemplateParam tp prefixr -> (tp, c) &+ (prefixr, c)
-      PrefixDeclType dt prefixr -> (dt, c) &+ (prefixr, c)
-      PrefixClosure cp -> sayable @saytag (cp, c) -- ??
-      Prefix prefixr -> sayable @saytag (prefixr, c)
+      PrefixTemplateParam tp prefixr -> WC tp c &+ WC prefixr c
+      PrefixDeclType dt prefixr -> WC dt c &+ WC prefixr c
+      PrefixClosure cp -> sayable @saytag $ WC cp c -- ??
+      Prefix prefixr -> sayable @saytag $ WC prefixr c
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (TemplateArgs, Context)
-  ) => Sayable saytag (PrefixR, Context) where
-  sayable (p, c) =
+  $(sayableConstraints ''PrefixR
+  ) => Sayable saytag (WithContext PrefixR) where
+  sayable (WC p c) =
     case p of
-      PrefixUQName uqn pfr@(PrefixUQName {}) -> (uqn,c) &+ t'"::" &+ (pfr,c)
-      PrefixUQName uqn pfr -> (uqn,c) &+ (pfr,c)
-      PrefixTemplateArgs ta pfr -> (ta,c) &+ (pfr,c)
+      PrefixUQName uqn pfr@(PrefixUQName {}) -> WC uqn c &+ t'"::" &+ WC pfr c
+      PrefixUQName uqn pfr -> WC uqn c &+ WC pfr c
+      PrefixTemplateArgs ta pfr -> WC ta c &+ WC pfr c
       PrefixEnd -> sayable @saytag $ t'""
 
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (CVQualifier, Context) where
-  sayable (q, _c) =
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext CVQualifier) where
+  sayable (WC q _c) =
     case q of
       Restrict -> sayable @saytag $ t'"restrict"
       Volatile -> sayable @saytag $ t'"volatile"
       Const_ -> sayable @saytag $ t'"const"
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (RefQualifier, Context) where
-  sayable (q, _c) =
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext RefQualifier) where
+  sayable (WC q _c) =
     case q of
       Ref -> sayable @saytag '&'
       RefRef -> sayable @saytag $ t'"&&"
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (Prefix, UnqualifiedName, Context)
-  , Sayable saytag (TemplateParam, Context)
-  ) => Sayable saytag (TemplatePrefix, Context) where
-  sayable (p, c) =
+  ($(sayableConstraints ''TemplatePrefix)
+  , Sayable saytag (WithContext PrefixUQN)
+  ) => Sayable saytag (WithContext TemplatePrefix) where
+  sayable (WC p c) =
     case p of
       GlobalTemplate uqns -> ctxLst' uqns c "::"
-      NestedTemplate pr uqns -> (pr,c) &+ t'"::"
-                                &+ t'"::" &:* ((\n -> (pr,n,c)) <$> uqns)
-      TemplateTemplateParam tp -> sayable @saytag (tp, c)
+      NestedTemplate pr uqns -> WC pr c &+ t'"::"
+                                &+ ctxLst' (PUC pr <$> uqns) c "::"
+      TemplateTemplateParam tp -> sayable @saytag $ WC tp c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (TemplateArg, Context)
-  ) => Sayable saytag (TemplateArgs, Context) where
-  sayable (args, c) = '<' &+ ctxLst args c &+ templateArgsEnd args
+  (Sayable saytag (WithContext TemplateArg)
+  ) => Sayable saytag (WithContext TemplateArgs) where
+  sayable (WC args c) = '<' &+ ctxLst args c &+ templateArgsEnd args
 
 -- C++ requires a space between template argument closures to resolve the parsing
 -- ambiguity between that and a right shift operation.(e.g. "list<foo<int> >"
@@ -362,16 +362,13 @@ templateArgsEnd args = case NEL.last args of
                         _ -> ">"
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  , Sayable saytag (ExprPrimary, Context)
-  , Sayable saytag (Expression, Context)
-  , Sayable saytag (TemplateArgs, Context)
-  ) => Sayable saytag (TemplateArg, Context) where
-  sayable (p, c) =
+  $(sayableConstraints ''TemplateArg
+  ) => Sayable saytag (WithContext TemplateArg) where
+  sayable (WC p c) =
     case p of
-      TArgType ty -> sayable @saytag (ty, c)
-      TArgSimpleExpr ep -> sayable @saytag (ep, c)
-      TArgExpr expr -> sayable @saytag (expr, c)
+      TArgType ty -> sayable @saytag $ WC ty c
+      TArgSimpleExpr ep -> sayable @saytag $ WC ep c
+      TArgExpr expr -> sayable @saytag $ WC expr c
       TArgPack tas ->
         -- Expected some ellipses (see
         -- https://en.cppreference.com/w/cpp/language/parameter-pack), but
@@ -385,21 +382,19 @@ instance {-# OVERLAPPABLE #-}
         ctxLst tas c
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (ExprPrimary, Context)
-  , Sayable saytag (TemplateParam, Context)
-  ) => Sayable saytag (Expression, Context) where
-  sayable (e, c) =
+  $(sayableConstraints ''Expression
+  ) => Sayable saytag (WithContext Expression) where
+  sayable (WC e c) =
     case e of
-      ExprPack expr -> sayable @saytag (expr, c)
-      ExprTemplateParam tp -> sayable @saytag (tp, c)
-      ExprPrim pe -> sayable @saytag (pe, c)
+      ExprPack expr -> sayable @saytag $ WC expr c
+      ExprTemplateParam tp -> sayable @saytag $ WC tp c
+      ExprPrim pe -> sayable @saytag $ WC pe c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  , Sayable saytag (Encoding, Context)
-  ) => Sayable saytag (ExprPrimary, Context) where
-  sayable (e, c) =
+  $(sayableConstraints ''ExprPrimary
+  ) => Sayable saytag (WithContext ExprPrimary) where
+  sayable (WC e c) =
     case e of
       IntLit ty n ->
         -- Normally these are printed with a typecast (e.g. `(type)`) ".
@@ -412,37 +407,31 @@ instance {-# OVERLAPPABLE #-}
                             Just (_, cst, sfx) -> if T.null sfx
                                                   then '(' &+ cst &+ ')' &+ n
                                                   else n &+ sfx
-                            _ -> '(' &+ (ty, c) &+ ')' &+ n
-          _ -> '(' &+ (ty, c) &+ ')' &+ n
-      FloatLit ty n -> '(' &+ (ty, c) &+ ')' &+ n
-      ComplexFloatLit ty r i -> '(' &+ (ty, c) &+ ')' &+ '(' &+ r &+ ',' &- i &+ ')'
-      DirectLit ty -> '(' &+ (ty, c) &+ t'")NULL"  -- except String?
-      NullPtrTemplateArg ty -> '(' &+ (ty, c) &+ t'")0"
-      ExternalNameLit enc -> sayable @saytag (enc, c)
+                            _ -> '(' &+ WC ty c &+ ')' &+ n
+          _ -> '(' &+ WC ty c &+ ')' &+ n
+      FloatLit ty n -> '(' &+ WC ty c &+ ')' &+ n
+      ComplexFloatLit ty r i -> '(' &+ WC ty c &+ ')' &+ '(' &+ r &+ ',' &- i &+ ')'
+      DirectLit ty -> '(' &+ WC ty c &+ t'")NULL"  -- except String?
+      NullPtrTemplateArg ty -> '(' &+ WC ty c &+ t'")0"
+      ExternalNameLit enc -> sayable @saytag $ WC enc c
 
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (ClosurePrefix, Context) where
-  sayable (_p, _c) = cannotSay Demangler "sayable"
-                     [ "No Sayable for ClosurePrefix" ]
-
--- instance {-# OVERLAPPABLE #-} Sayable saytag (TemplateParam, Context) where
---   sayable (p, _c) = undefined
-
--- instance {-# OVERLAPPABLE #-} Sayable saytag (DeclType, Context) where
---   sayable (p, _c) = undefined
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext ClosurePrefix) where
+  sayable (WC _p _c) = cannotSay Demangler "sayable"
+                       [ "No Sayable for ClosurePrefix" ]
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (StdType, Context)
-  ) => Sayable saytag (Substitution, Context) where
-  sayable (p, c) =
+  $(sayableConstraints ''Substitution
+  ) => Sayable saytag (WithContext Substitution) where
+  sayable (WC p c) =
     case p of
       SubStd -> t'"std" &+ t'""
       SubAlloc -> t'"std" &+ t'"::allocator"
       SubBasicString -> t'"std" &+ t'"::basic_string"
-      SubStdType stdTy -> sayable @saytag (stdTy, c)
+      SubStdType stdTy -> sayable @saytag $ WC stdTy c
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (StdType, Context) where
-  sayable (stdTy, _c) =
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext StdType) where
+  sayable (WC stdTy _c) =
     let ct = t'"std::char_traits<char>" in
     case stdTy of
       BasicStringChar -> t'"std::basic_string<char," &- ct &+ t'", std::allocator<char> >"
@@ -450,103 +439,94 @@ instance {-# OVERLAPPABLE #-} Sayable saytag (StdType, Context) where
       BasicOStream -> t'"std::basic_ostream<char," &- ct &- '>'
       BasicIOStream -> t'"std::basic_iostream<char," &- ct &- '>'
 
--- instance {-# OVERLAPPABLE #-} Sayable saytag (ExtendedQualifier, Context) where
---   sayable (p, _c) = undefined
 
 -- n.b. LLVM and GNU syntax seems to be [abi:foo][abi:bar], despite the website
 -- documentation of [[gnu::abi_tag ("foo", "bar")]]
 instance {-# OVERLAPPABLE #-}
-  (Sayable saytag (SourceName, Context)
-  ) => Sayable saytag (ABI_Tag, Context) where
-  sayable (ABITag p, c) = t'"[abi:" &+ (p,c) &+ ']'
+  $(sayableConstraints ''ABI_Tag
+  ) => Sayable saytag (WithContext ABI_Tag) where
+  sayable (WC (ABITag p) c) = t'"[abi:" &+ WC p c &+ ']'
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (BaseType, Context)
-  , Sayable saytag (ArrayBound, Context)
-  , Sayable saytag (Name, Context)
-  , Sayable saytag (CVQualifier, Context)
-  , Sayable saytag (ExtendedQualifier, Context)
-  , Sayable saytag (ExceptionSpec, Context)
-  , Sayable saytag (Transaction, Context)
- ) => Sayable saytag (Type_, Context) where
-  sayable (ty, c) =
+  $(sayableConstraints ''Type_
+ ) => Sayable saytag (WithContext Type_) where
+  sayable (WC ty c) =
     case ty of
-      BaseType t -> sayable @saytag (t,c)
-      QualifiedType [] [] t -> sayable @saytag (t,c)
-      QualifiedType eqs [] t -> (t,c) &+ ctxLst' eqs c " "
-      QualifiedType [] cvqs t -> (t,c) &- ctxLst' cvqs c " "
-      QualifiedType eqs cvqs t -> (t,c) &- ctxLst' eqs c " " &- ctxLst' cvqs c " "
-      ClassUnionStructEnum n -> sayable @saytag (n,c)
-      ClassStruct n -> sayable @saytag (n,c)
-      Union n -> sayable @saytag (n,c)
-      Enum n -> sayable @saytag (n,c)
+      BaseType t -> sayable @saytag $ WC t c
+      QualifiedType [] [] t -> sayable @saytag $ WC t c
+      QualifiedType eqs [] t -> WC t c &+ ctxLst' eqs c " "
+      QualifiedType [] cvqs t -> WC t c &- ctxLst' cvqs c " "
+      QualifiedType eqs cvqs t -> WC t c &- ctxLst' eqs c " " &- ctxLst' cvqs c " "
+      ClassUnionStructEnum n -> sayable @saytag $ WC n c
+      ClassStruct n -> sayable @saytag $ WC n c
+      Union n -> sayable @saytag $ WC n c
+      Enum n -> sayable @saytag $ WC n c
       Function {} -> sayFunctionType ty "" c
       Pointer f@(Function {}) -> sayFunctionType f "(*)" c
-      Pointer (ArrayType bnd t) -> (t,c) &- t'"(*)" &- '[' &+ (bnd,c) &+ ']'
-      Pointer t -> (t,c) &+ '*'
-      LValRef (ArrayType bnd t) -> (t,c) &- t'"(&)" &- '[' &+ (bnd,c) &+ ']'
-      LValRef t -> (t,c) &+ '&'
-      RValRef t -> (t,c) &+ t'"&&"
-      ComplexPair t -> (t,c) &- t'"complex"
-      Imaginary t -> (t,c) &- t'"imaginary"
-      ArrayType bnd t -> (t,c) &+ '[' &+ (bnd,c) &+ ']'
-      Template tp ta -> (tp,c) &- (ta,c) -- ??
+      Pointer (ArrayType bnd t) -> WC t c &- t'"(*)" &- '[' &+ WC bnd c &+ ']'
+      Pointer t -> WC t c &+ '*'
+      LValRef (ArrayType bnd t) -> WC t c &- t'"(&)" &- '[' &+ WC bnd c &+ ']'
+      LValRef t -> WC t c &+ '&'
+      RValRef t -> WC t c &+ t'"&&"
+      ComplexPair t -> WC t c &- t'"complex"
+      Imaginary t -> WC t c &- t'"imaginary"
+      ArrayType bnd t -> WC t c &+ '[' &+ WC bnd c &+ ']'
+      Template tp ta -> WC tp c &- WC ta c -- ??
       Cpp11PackExpansion ts ->
         -- XXX expected some "..." (see
         -- https://en.cppreference.com/w/cpp/language/parameter-pack) but c++filt
         -- does not visibly decorate these.
-        t'"" &+* ((,c) <$> ts)
-      StdType stdTy -> sayable @saytag (stdTy, c)
+        ctxLst ts c
+      StdType stdTy -> sayable @saytag $ WC stdTy c
+
 
 sayFunctionType :: Type_ -> Text -> Context -> Saying saytag
 sayFunctionType (Function cvqs mb'exc trns isExternC rTy argTys mb'ref) nm c =
   ctxLst' cvqs c " "
-  &? ((,c) <$> mb'exc)
-  &+ (trns, c)
+  &? wCtx mb'exc c
+  &+ WC trns c
   &+ (if isExternC then t'" extern \"C\"" else t'"")
-  &+ (rTy, c)
+  &+ WC rTy c
   &- nm &+ '('
   &+* (case argTys of
           BaseType Void :| [] -> []
-          _ -> (,c) <$> NEL.toList argTys
+          _ -> wCtx (NEL.toList argTys) c
       )
   &+ ')'
-  &? ((,c) <$> mb'ref)
+  &? wCtx mb'ref c
 sayFunctionType _ _ _ = cannotSay Demangler "sayFunctionType"
                         [ "Called with a type that is not a Function!" ]
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Expression, Context)
-  ) => Sayable saytag (ArrayBound, Context) where
-  sayable (n, c) =
+  $(sayableConstraints ''ArrayBound
+  ) => Sayable saytag (WithContext ArrayBound) where
+  sayable (WC n c) =
     case n of
       NoBounds -> sayable @saytag $ t'""
       NumBound i -> sayable @saytag i
-      ExprBound e -> sayable @saytag (e,c)
+      ExprBound e -> sayable @saytag $ WC e c
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Expression, Context)
-  , Sayable saytag (Type_, Context)
-  ) => Sayable saytag (ExceptionSpec, Context) where
-  sayable (exc, c) =
+  $(sayableConstraints ''ExceptionSpec
+  ) => Sayable saytag (WithContext ExceptionSpec) where
+  sayable (WC exc c) =
     case exc of
       NonThrowing -> sayable @saytag $ t'"noexcept"
-      ComputedThrow expr -> t'"throw" &- (expr, c) -- ?
-      Throwing tys -> t'"throw (" &+* ((,c) <$> tys) &+ ')' -- ?
+      ComputedThrow expr -> t'"throw" &- WC expr c -- ?
+      Throwing tys -> t'"throw (" &+ wCtx tys c &+ ')' -- ?
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (Transaction, Context) where
-  sayable (trns, _c) =
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext Transaction) where
+  sayable (WC trns _c) =
     case trns of
       TransactionSafe -> sayable @saytag $ t'"safe" -- ?
       TransactionUnsafe -> sayable @saytag $ t'""
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (SourceName, Context)
-  , Sayable saytag (TemplateArgs, Context)
-  ) => Sayable saytag (BaseType, Context) where
-  sayable (t, c) =
+  $(sayableConstraints ''BaseType
+  ) => Sayable saytag (WithContext BaseType) where
+  sayable (WC t c) =
     case lookup t builtinTypeTable of
       Just (_,s,_) -> sayable @saytag s
       Nothing ->
@@ -555,23 +535,26 @@ instance {-# OVERLAPPABLE #-}
           FloatNx n -> t'"std::float" &+ n &+ t'"x_t"
           SBitInt n -> t'"signed _BitInt(" &+ n &+ ')'
           UBitInt n -> t'"unsigned _BitInt(" &+ n &+ ')'
-          VendorExtendedType nm mb'ta -> (nm,c) &? ((,c) <$> mb'ta)
+          VendorExtendedType nm mb'ta -> WC nm c &? wCtx mb'ta c
           _ -> cannotSay Demangler "sayable.Basetype"
                [ "Unknown BaseType not listed in the builtinTypeTable"
                , show t
                ]
 
+instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext CallOffset) where
+  sayable (WC _co _c) =
+    cannotSay Demangler "Sayable CallOffset"
+    [ "The CallOffset is for a thunk or covariant return thunk"
+    , "and is not expected to be printed."
+    ]
+
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (Type_, Context)
-  , Sayable saytag (UnqualifiedName, Context)
-  , Sayable saytag (Prefix, Context)
-  , Sayable saytag (TemplatePrefix, Context)
-  , Sayable saytag (TemplateArg, Context)
-  ) => Sayable saytag (SubsCandidate, Context) where
-  sayable (cand, c) = -- For debug only
+  $(sayableConstraints ''SubsCandidate
+  ) => Sayable saytag (WithContext SubsCandidate) where
+  sayable (WC cand c) = -- For debug only
     case cand of
-      SC_Type t -> t'"SC_Ty" &- (t, c)
-      SC_UQName True n -> t'"SC_UN" &- t'"std::" &+ (n, c)
-      SC_UQName _ n -> t'"SC_UN" &- (n, c)
-      SC_Prefix p -> t'"SC_PR" &- (p, c)
-      SC_TemplatePrefix tp -> t'"SC_TP" &- (tp, c)
+      SC_Type t -> t'"SC_Ty" &- WC t c
+      SC_UQName True n -> t'"SC_UN" &- t'"std::" &+ WC n c
+      SC_UQName _ n -> t'"SC_UN" &- WC n c
+      SC_Prefix p -> t'"SC_PR" &- WC p c
+      SC_TemplatePrefix tp -> t'"SC_TP" &- WC tp c

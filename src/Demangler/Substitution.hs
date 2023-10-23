@@ -38,6 +38,7 @@ import           Data.Maybe
 import           Data.Sequence ( (|>), ViewR((:>)) )
 import qualified Data.Sequence as Seq
 
+import           Demangler.Context
 import           Demangler.Engine
 import           Demangler.Structure
 import           Demangler.PPrint ()
@@ -125,11 +126,11 @@ dumpSubs :: (Monad f, Applicative f)
 dumpSubs spec what = do
     mapM_ (traceM . show) $ Seq.zip
              (Seq.fromList [0.. Seq.length (spec ^. nSubs)])
-             ((\ue -> (ue, sez @"debug" (ue, spec ^. nContext)))
+             ((\ue -> (ue, sez @"debug" (WC ue (spec ^. nContext))))
               <$> spec ^. nSubs)
     mapM_ (traceM . show) $ Seq.zip
              (Seq.fromList [0.. Seq.length (spec ^. nTmplSubs)])
-             ((\ue -> ('T', ue, sez @"debug" (ue, spec ^. nContext)))
+             ((\ue -> ('T', ue, sez @"debug" (WC ue (spec ^. nContext))))
               <$> spec ^. nTmplSubs)
     traceM $ "Subs Total: " <> show ((Seq.length $ spec ^. nSubs) + (Seq.length $ spec ^. nTmplSubs)) <> " "
         <> show ((Seq.length $ spec ^. nSubs), (Seq.length $ spec ^. nTmplSubs))

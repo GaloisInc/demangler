@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Demangler.Context
   (
     Context
@@ -5,12 +6,17 @@ module Demangler.Context
   , newDemangling
   , contextFindOrAdd
   , contextStr
+  , WithContext(..)
+  , sayableConstraints
   )
 where
 
 import           Data.Sequence ( (|>) )
 import qualified Data.Sequence as Seq
 import           Data.Text ( Text )
+import qualified Language.Haskell.TH as TH
+
+import Text.Sayable
 
 
 -- | The Context provides a persistent information and collection over a set of
@@ -42,3 +48,21 @@ contextFindOrAdd s c@(Context l) =
 
 contextStr :: Context -> Coord -> Text
 contextStr (Context l) i = l `Seq.index` i
+
+data WithContext a = WC a Context
+
+sayableConstraints :: TH.Name -> TH.PredQ
+sayableConstraints forTy = do
+  let rTy = TH.ConT forTy
+  wctxt <- [t|WithContext|]
+  sayableSubConstraints $ do ofType forTy
+                             paramTH rTy
+                             subElemFilter (not
+                                            . (`elem` [ "Context"
+                                                      , "Bool"
+                                                      , "Natural"
+                                                      , "Float"
+                                                      ])
+                                             . TH.nameBase)
+                             subWrapper wctxt
+                             tagVar "saytag"
