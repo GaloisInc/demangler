@@ -178,10 +178,10 @@ instance {-# OVERLAPPABLE #-}
   ) =>  Sayable saytag (UnqualifiedName, Context) where
   sayable (n, c) =
     case n of
-      SourceName i -> sayable @saytag (i,c)
+      SourceName i [] -> sayable @saytag (i,c)
+      SourceName i tags -> sayable @saytag (i,c) &+ ctxLst' tags c ""
       OperatorName op [] -> sayable @saytag (op, c)
-      OperatorName op tags ->
-        (op, c) &- t'"[[gnu::abi_tag (" &+ ctxLst tags c &+ t'")]]"
+      OperatorName op tags -> sayable @saytag (op, c) &+ ctxLst' tags c ""
       CtorDtorName cd -> sayable @saytag (cd, c)
       StdSubst subs -> sayable @saytag (subs, c)
       ModuleNamed mn uqn -> ctxLst' mn c "" &+ (uqn,c)
@@ -453,10 +453,12 @@ instance {-# OVERLAPPABLE #-} Sayable saytag (StdType, Context) where
 -- instance {-# OVERLAPPABLE #-} Sayable saytag (ExtendedQualifier, Context) where
 --   sayable (p, _c) = undefined
 
+-- n.b. LLVM and GNU syntax seems to be [abi:foo][abi:bar], despite the website
+-- documentation of [[gnu::abi_tag ("foo", "bar")]]
 instance {-# OVERLAPPABLE #-}
   (Sayable saytag (SourceName, Context)
   ) => Sayable saytag (ABI_Tag, Context) where
-  sayable (ABITag p, c) = '"' &+ (p, c) &+ '"'
+  sayable (ABITag p, c) = t'"[abi:" &+ (p,c) &+ ']'
 
 instance {-# OVERLAPPABLE #-}
   ( Sayable saytag (BaseType, Context)

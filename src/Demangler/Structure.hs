@@ -60,7 +60,7 @@ data ModuleName = ModuleName IsPartition SourceName
 
 type IsPartition = Bool
 
-data UnqualifiedName = SourceName SourceName
+data UnqualifiedName = SourceName SourceName [ABI_Tag]
                      | OperatorName Operator [ABI_Tag]
                      | CtorDtorName CtorDtor
                      | StdSubst Substitution

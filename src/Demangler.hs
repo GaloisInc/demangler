@@ -341,7 +341,8 @@ base_uqn = asum' [ \i -> do op <- operator_name i
                             at <- many' abi_tag $ rdiscard op
                             ret at $ OperatorName (op ^. nVal) (at ^. nVal)
                  , ctor_dtor_name >=> rmap CtorDtorName
-                 , source_name >=> rmap SourceName
+                 , source_name >&=> many' abi_tag . rdiscard
+                   >=> rmap (uncurry SourceName)
                  , unnamed_type_name
                    -- , match "DC" i >>= some source_name >>= match "E"
                  ]
@@ -616,10 +617,9 @@ template_prefix_and_args =
                                cannot Demangler "template_prefix_and_args"
                                ["Penultimate prefix must be an UnqualifiedName"]
                              Left un ->
+                               -- ultimate prefix entry must be template_args
                                case entas of
-                                 Left _ ->
-                                   cannot Demangler "template_prefix_and_args"
-                                   [ "Ultimate prefix must be template args" ]
+                                 Left _ -> Nothing
                                  Right tas ->
                                    let constr = case rmnpval of
                                                   EmptyPrefix -> GlobalTemplate
