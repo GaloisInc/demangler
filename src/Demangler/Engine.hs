@@ -159,7 +159,7 @@ many' p i = case p i of
               Just e -> many' p (rdiscard e) >>= rmap (e ^. nVal :)
 
 optional' :: Next a b -> Next a (a, Maybe b)
-optional' o i@(_, (a, _)) = (o i >>= rmap ((a,) . Just)) <|> rmap (,Nothing) i
+optional' o i = (o i >>= rmap ((i ^. nVal,) . Just)) <|> rmap (,Nothing) i
 
 (>&=>) :: Next a b -> Next b c -> Next a (b,c)
 a >&=> b = \i -> do x <- a i
