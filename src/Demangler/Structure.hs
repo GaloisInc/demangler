@@ -55,18 +55,21 @@ type FunctionScope = Coord
 type FunctionEntity = Coord
 type Discriminator = Coord
 
-data ModuleName = ModuleName IsPartition UnqualifiedName -- KWQ: just a SourceName
+data ModuleName = ModuleName IsPartition SourceName
   deriving (Eq, Show)
 
 type IsPartition = Bool
 
-data UnqualifiedName = SourceName Coord
+data UnqualifiedName = SourceName SourceName
                      | OperatorName Operator [ABI_Tag]
                      | CtorDtorName CtorDtor
                      | StdSubst Substitution
                      | ModuleNamed [ModuleName] UnqualifiedName
                       --  | UnnamedTypeName ...  starts with "U"
                      --  | StructuredBinding ...
+  deriving (Eq, Show)
+
+newtype SourceName = SrcName Coord
   deriving (Eq, Show)
 
 data CtorDtor = CompleteCtor
@@ -133,11 +136,12 @@ data Operator = OpNew
               | OpAlignOfType
               | OpAlignOfExpr
               | OpCast Type_
-              | OpString UnqualifiedName
-              | OpVendor Natural UnqualifiedName
+              | OpString SourceName
+              | OpVendor Natural SourceName
   deriving (Eq, Show)
 
-data ABI_Tag = ABITag UnqualifiedName
+
+data ABI_Tag = ABITag SourceName
   deriving (Eq, Show)
 
 data SpecialName = VirtualTable Type_
@@ -215,7 +219,7 @@ data BaseType = Void | Wchar_t | Bool_
               | N1168FixedPointAccumSat
               | N1168FixedPointFract
               | N1168FixedPointFractSat
-              | VendorExtendedType UnqualifiedName (Maybe TemplateArgs)
+              | VendorExtendedType SourceName (Maybe TemplateArgs)
   deriving (Eq, Show)
 
 data StdType = BasicStringChar

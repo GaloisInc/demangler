@@ -341,7 +341,7 @@ base_uqn = asum' [ \i -> do op <- operator_name i
                             at <- many' abi_tag $ rdiscard op
                             ret at $ OperatorName (op ^. nVal) (at ^. nVal)
                  , ctor_dtor_name >=> rmap CtorDtorName
-                 , source_name
+                 , source_name >=> rmap SourceName
                  , unnamed_type_name
                    -- , match "DC" i >>= some source_name >>= match "E"
                  ]
@@ -378,10 +378,10 @@ ctor_dtor_name = asum' [ match "C1" >=> ret' CompleteCtor
                        , match "D2" >=> ret' BaseDtor
                        ]
 
-source_name :: AnyNext UnqualifiedName
+source_name :: AnyNext SourceName
 source_name = digits_num >=> identifier
 
-identifier :: Next Int UnqualifiedName
+identifier :: Next Int SourceName
 identifier i =
   let identChar x = isAlphaNum x || x == '_'
       (nm, ri) = T.splitAt (i ^. nVal) (i ^. nInp)
@@ -389,7 +389,7 @@ identifier i =
         let (idnt, c') = contextFindOrAdd nm (i ^. nContext)
         pure $ i
           & nInp .~ ri
-          & nVal .~ SourceName idnt
+          & nVal .~ SrcName idnt
           & nContext .~ c'
 
 

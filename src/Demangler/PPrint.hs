@@ -174,16 +174,20 @@ instance {-# OVERLAPPABLE #-}
   ( Sayable saytag (Operator, Context)
   , Sayable saytag (ABI_Tag, Context)
   , Sayable saytag (CtorDtor, Context)
+  , Sayable saytag (SourceName, Context)
   ) =>  Sayable saytag (UnqualifiedName, Context) where
   sayable (n, c) =
     case n of
-      SourceName i -> sayable @saytag $ contextStr c i
+      SourceName i -> sayable @saytag (i,c)
       OperatorName op [] -> sayable @saytag (op, c)
       OperatorName op tags ->
         (op, c) &- t'"[[gnu::abi_tag (" &+ ctxLst tags c &+ t'")]]"
       CtorDtorName cd -> sayable @saytag (cd, c)
       StdSubst subs -> sayable @saytag (subs, c)
       ModuleNamed mn uqn -> ctxLst' mn c "" &+ (uqn,c)
+
+instance {-# OVERLAPPABLE #-} Sayable saytag (SourceName, Context) where
+  sayable (SrcName i, c) = sayable @saytag $ contextStr c i
 
 instance {-# OVERLAPPABLE #-}
   ( Sayable saytag (Operator, Context)
@@ -248,7 +252,7 @@ instance {-# OVERLAPPABLE #-}
 
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
+  ( Sayable saytag (SourceName, Context)
   , Sayable saytag (Type_, Context)
   ) =>  Sayable saytag (Operator, Context) where
   sayable (op, c) =
@@ -257,8 +261,8 @@ instance {-# OVERLAPPABLE #-}
       Nothing ->
         case op of
           OpCast ty -> t'"operator" &- (ty, c)
-          OpString uqnm -> sayable @saytag (uqnm, c)
-          OpVendor n uqnm -> t'"vendor" &- n &- (uqnm, c)
+          OpString snm -> sayable @saytag (snm, c)
+          OpVendor n snm -> t'"vendor" &- n &- (snm, c)
           _ -> cannotSay Demangler "sayable"
                [ "Operator not in opTable or with a specific override:"
                , show op
@@ -449,7 +453,9 @@ instance {-# OVERLAPPABLE #-} Sayable saytag (StdType, Context) where
 -- instance {-# OVERLAPPABLE #-} Sayable saytag (ExtendedQualifier, Context) where
 --   sayable (p, _c) = undefined
 
-instance {-# OVERLAPPABLE #-} Sayable saytag (ABI_Tag, Context) where
+instance {-# OVERLAPPABLE #-}
+  (Sayable saytag (SourceName, Context)
+  ) => Sayable saytag (ABI_Tag, Context) where
   sayable (ABITag p, c) = '"' &+ (p, c) &+ '"'
 
 instance {-# OVERLAPPABLE #-}
@@ -521,7 +527,7 @@ instance {-# OVERLAPPABLE #-} Sayable saytag (Transaction, Context) where
       TransactionUnsafe -> sayable @saytag $ t'""
 
 instance {-# OVERLAPPABLE #-}
-  ( Sayable saytag (UnqualifiedName, Context)
+  ( Sayable saytag (SourceName, Context)
   , Sayable saytag (TemplateArgs, Context)
   ) => Sayable saytag (BaseType, Context) where
   sayable (t, c) =
