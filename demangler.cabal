@@ -63,7 +63,6 @@ library
                       Demangler.PPrint
                       Demangler.Structure
                       Demangler.Substitution
-    -- other-extensions:
     build-depends:    base >=4.10 && < 5
                     , containers
                     , lens >= 5.0 && < 5.3
@@ -78,11 +77,8 @@ executable demangle
     hs-source-dirs:   app
     default-language: Haskell2010
     main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
     build-depends:    base
                     , demangler
-                    , prettyprinter
                     , sayable
                     , text
                     , transformers
@@ -90,8 +86,6 @@ executable demangle
 test-suite demangler-test
     import:           config
     default-language: Haskell2010
-    -- other-modules:
-    -- other-extensions:
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Test.hs
