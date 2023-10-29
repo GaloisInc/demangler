@@ -1,5 +1,9 @@
 # Revision history for demangler
 
+## 1.2.0.0 -- 2023.10.29
+
+* Updated support for local names.
+
 ## 1.1.0.0 -- 2023.10.23
 
 * Added support for `ABI_Tags` on `SourceName`.
@@ -16,6 +20,6 @@
 
 * Parity with origin tests.
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0 -- 2023-10-15
 
 * Initial version.
