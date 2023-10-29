@@ -25,7 +25,7 @@ module Demangler
 where
 
 import           Control.Applicative
-import           Control.Lens ( (&), (^.), view, (.~), (||~) )
+import           Control.Lens ( (&), (^.), (.~), (||~) )
 import           Control.Monad
 import           Data.Char
 import           Data.Either ( isRight )
@@ -203,18 +203,19 @@ unscoped_template_name i =
 
 
 local_name :: AnyNext Name
-local_name i = do f <- match "Z" i >>= function_encoding
-                  c <- match "E" f
-                  entity f c <|> stringlit f c
-  where
-    entity f c = do e <- entity_name c
-                    discriminated f e
-                      <|> ret e (LocalName (f ^. nVal) (e ^. nVal) Nothing)
-    stringlit f c = do s <- match "s" c
-                       d <- optional (discriminator s)
-                       ret (fromMaybe s d) $ StringLitName (f ^. nVal) (view nVal <$> d)
-    discriminated f e = do d <- discriminator e
-                           ret d $ LocalName (f ^. nVal) (e ^. nVal) (Just $ d ^. nVal)
+local_name = match "Z"
+             >=> function_encoding
+             >=> match "E"
+             >=> asum' [ match "s"
+                         >=> rmap StringLitName
+                         >=> optional' discriminator
+                         >=> rmap (uncurry ($))
+                       , rmap LocalName
+                         >&=> name
+                         >=> rmap (uncurry ($))
+                         >=> optional' discriminator
+                         >=> rmap (uncurry ($))
+                       ]
 
 
 -- | Parse any CV qualifiers; always succeeds but might return an empty array.
@@ -605,11 +606,13 @@ array_type = match "A"
                          >=> rmap (uncurry (ArrayType . ExprBound))
                        ]
 
-function_encoding :: AnyNext FunctionScope
-function_encoding = tbd "function_encoding"
-
-entity_name :: Next a FunctionEntity
-entity_name = tbd "entity_name"
+function_encoding :: AnyNext Encoding
+function_encoding i = do e <- encoding i
+                         require $ case e ^. nVal of
+                                     EncFunc {} -> True
+                                     EncStaticFunc {} -> True
+                                     _ -> False
+                         return e
 
 discriminator :: Next a Int
 discriminator = asum' [ match "_" >=> single_digit_num

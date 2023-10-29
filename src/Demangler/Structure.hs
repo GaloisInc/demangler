@@ -41,8 +41,8 @@ data FunctionName = FunctionName Name
 data Name = NameNested NestedName
           | UnscopedName Bool UnqualifiedName -- Bool is "std::" prefix
           | UnscopedTemplateName Name TemplateArgs
-          | LocalName FunctionScope FunctionEntity (Maybe Discriminator)
-          | StringLitName FunctionScope (Maybe Discriminator)
+          | LocalName Encoding Name (Maybe Discriminator)
+          | StringLitName Encoding (Maybe Discriminator)
   deriving (Eq, Show)
 
 data NestedName = NestedName Prefix UnqualifiedName
@@ -51,7 +51,6 @@ data NestedName = NestedName Prefix UnqualifiedName
                   [CVQualifier] (Maybe RefQualifier)
   deriving (Eq, Show)
 
-type FunctionScope = Coord
 type FunctionEntity = Coord
 type Discriminator = Coord
 
