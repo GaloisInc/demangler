@@ -10,6 +10,15 @@ import Numeric.Natural
 
 import Demangler.Context
 
+-- | The Demangled data structure holds the demangled name in data-oriented
+-- format.  This format encodes the various roles and portions of the mangled
+-- name in an AST-like structure that closely matches the mangled specification.
+-- Unfortunately, this is a relatively messy representation that is not easy to
+-- work with, and where things that might seem simple (e.g. the base function
+-- name) can be encoded in a number of different ways.  Therefore, the details of
+-- this structure are not exported and it should either be rendered to printable
+-- version via the 'sayable' package or inspected via accessor functions (like
+-- 'functionName').
 
 data Demangled = Original Coord
                | Encoded Encoding

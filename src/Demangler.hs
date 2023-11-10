@@ -21,6 +21,7 @@ module Demangler
   , Result
   , demangle
   , demangle1
+  , functionName
   )
 where
 
@@ -37,6 +38,7 @@ import           Data.Text ( Text )
 import qualified Data.Text as T
 import           Text.Sayable
 
+import           Demangler.Accessors
 import           Demangler.Context
 import           Demangler.Engine
 import           Demangler.PPrint ()
