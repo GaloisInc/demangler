@@ -467,6 +467,10 @@ instance {-# OVERLAPPABLE #-}
       Pointer t -> WC t c &+ '*'
       LValRef (ArrayType bnd t) -> WC t c &- t'"(&)" &- '[' &+ WC bnd c &+ ']'
       LValRef t -> WC t c &+ '&'
+      RValRef (LValRef t@(QualifiedType _ [Const_] _)) ->
+        -- An rvalue may be used to initialize a const lvalue reference; see
+        -- https://en.cppreference.com/w/cpp/language/value_category
+        sayable @saytag $ WC (LValRef t) c
       RValRef t -> WC t c &+ t'"&&"
       ComplexPair t -> WC t c &- t'"complex"
       Imaginary t -> WC t c &- t'"imaginary"
