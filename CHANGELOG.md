@@ -1,5 +1,10 @@
 # Revision history for demangler
 
+## 1.3.0.0 -- 2023.11.09
+
+* Added `functionName` accessor to retrieve the name portions only of a function
+  (in reverse heirarchical order).
+
 ## 1.2.0.0 -- 2023.10.29
 
 * Updated support for local names.
