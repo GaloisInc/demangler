@@ -303,48 +303,48 @@ type DeclType = () -- XXX TBD
 -- | Table of builtin types as the internal BaseType representation, followed by
 -- a tuple of strings.  The first string is the reference to this type in a
 -- mangled name.  The second string is the C/C++ type name to be used when
--- writing a value cast.  The third string, if non-empty, is a C/C++ suffix that
+-- writing a value cast.  The third string, if specified, is a C/C++ suffix that
 -- can be written after literal values to indicate the type instead (for example,
 -- emit `10ul` instead of `(unsigned long)10`).
 
-builtinTypeTable :: [ (BaseType, (Text, Text, Text)) ]
+builtinTypeTable :: [ (BaseType, (Text, Text, Maybe Text)) ]
 builtinTypeTable =
-  [ (Void, ("v", "void", ""))
-  , (Wchar_t, ("w", "wchar_t", ""))
-  , (Bool_, ("b", "bool", ""))
-  , (Char_, ("c", "char", ""))
-  , (SChar, ("a", "signed char", ""))
-  , (UChar, ("h", "unsigned char", ""))
-  , (Short, ("s", "short", ""))
-  , (UShort, ("t", "unsigned short", ""))
-  , (Int_, ("i", "int", ""))
-  , (UInt, ("j", "unsigned int", ""))
-  , (Long, ("l", "long", "l"))
-  , (ULong, ("m", "unsigned long", "ul"))
-  , (LongLong, ("x", "long long", "")) -- __int64
-  , (ULongLong, ("y", "unsigned long long", "")) -- __int64
-  , (Int128, ("n", "__int128", ""))
-  , (UInt128, ("o", "unsigned __int128", ""))
-  , (Float_, ("f", "float", ""))
-  , (Double_, ("d", "double", ""))
-  , (LongDouble80, ("e", "long double", "")) -- __float80
-  , (Float128, ("g", "__float128", ""))
-  , (Ellipsis, ("z", "...", ""))
-  , (IEE754rDecFloat64, ("Dd", "__ieeefloat64", "")) -- ??
-  , (IEE754rDecFloat128, ("De", "__ieeefloat128", "")) -- ??
-  , (IEE754rDecFloat32, ("Df", "__ieeefloat32", "")) -- ??
-  , (IEE754rDecFloat16, ("Dh", "__ieeefloat16", "")) -- ??
-  , (BFloat16, ("DF16b", "std::bfloat16_t", ""))
-  , (Char32, ("Di", "char32_t", ""))
-  , (Char16, ("Ds", "char16_t", ""))
-  , (Char8, ("Du", "char8_t", ""))
-  , (Auto, ("Da", "auto", ""))
-  , (DeclTypeAuto, ("Dc", "decltype(auto)", "")) -- ??
-  , (NullPtr, ("Dn", "std::nullptr_t", "")) -- decltype(nullptr)
-  , (N1168FixedPointAccum, ("DA", "T _Accum", "")) -- ??
-  , (N1168FixedPointAccumSat, ("DS DA", "_Sat T _Accum", "")) -- ??
-  , (N1168FixedPointFract, ("DR", "T _Fract", "")) -- ??
-  , (N1168FixedPointFractSat, ("DS DR", "_Sat T _Fract", "")) -- ??
+  [ (Void, ("v", "void", Nothing))
+  , (Wchar_t, ("w", "wchar_t", Nothing))
+  , (Bool_, ("b", "bool", Nothing))
+  , (Char_, ("c", "char", Nothing))
+  , (SChar, ("a", "signed char", Nothing))
+  , (UChar, ("h", "unsigned char", Nothing))
+  , (Short, ("s", "short", Nothing))
+  , (UShort, ("t", "unsigned short", Nothing))
+  , (Int_, ("i", "int", Just ""))
+  , (UInt, ("j", "unsigned int", Just "u"))
+  , (Long, ("l", "long", Just "l"))
+  , (ULong, ("m", "unsigned long", Just "ul"))
+  , (LongLong, ("x", "long long", Nothing)) -- __int64
+  , (ULongLong, ("y", "unsigned long long", Nothing)) -- __int64
+  , (Int128, ("n", "__int128", Nothing))
+  , (UInt128, ("o", "unsigned __int128", Nothing))
+  , (Float_, ("f", "float", Nothing))
+  , (Double_, ("d", "double", Nothing))
+  , (LongDouble80, ("e", "long double", Nothing)) -- __float80
+  , (Float128, ("g", "__float128", Nothing))
+  , (Ellipsis, ("z", "...", Nothing))
+  , (IEE754rDecFloat64, ("Dd", "__ieeefloat64", Nothing)) -- ??
+  , (IEE754rDecFloat128, ("De", "__ieeefloat128", Nothing)) -- ??
+  , (IEE754rDecFloat32, ("Df", "__ieeefloat32", Nothing)) -- ??
+  , (IEE754rDecFloat16, ("Dh", "__ieeefloat16", Nothing)) -- ??
+  , (BFloat16, ("DF16b", "std::bfloat16_t", Nothing))
+  , (Char32, ("Di", "char32_t", Nothing))
+  , (Char16, ("Ds", "char16_t", Nothing))
+  , (Char8, ("Du", "char8_t", Nothing))
+  , (Auto, ("Da", "auto", Nothing))
+  , (DeclTypeAuto, ("Dc", "decltype(auto)", Nothing)) -- ??
+  , (NullPtr, ("Dn", "std::nullptr_t", Nothing)) -- decltype(nullptr)
+  , (N1168FixedPointAccum, ("DA", "T _Accum", Nothing)) -- ??
+  , (N1168FixedPointAccumSat, ("DS DA", "_Sat T _Accum", Nothing)) -- ??
+  , (N1168FixedPointFract, ("DR", "T _Fract", Nothing)) -- ??
+  , (N1168FixedPointFractSat, ("DS DR", "_Sat T _Fract", Nothing)) -- ??
   ]
 
 data Arity = Unary | Binary | Trinary | NoArity

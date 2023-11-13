@@ -404,9 +404,8 @@ instance {-# OVERLAPPABLE #-}
         case ty of
           BaseType Bool_ -> t'"" &+ if n > 0 then t'"true" else t'"false"
           BaseType bty -> case lookup bty builtinTypeTable of
-                            Just (_, cst, sfx) -> if T.null sfx
-                                                  then '(' &+ cst &+ ')' &+ n
-                                                  else n &+ sfx
+                            Just (_, _, Just sfx) -> n &+ sfx
+                            Just (_, cst, Nothing) -> '(' &+ cst &+ ')' &+ n
                             _ -> '(' &+ WC ty c &+ ')' &+ n
           _ -> '(' &+ WC ty c &+ ')' &+ n
       FloatLit ty n -> '(' &+ WC ty c &+ ')' &+ n
