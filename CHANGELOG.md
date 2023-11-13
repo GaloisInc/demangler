@@ -1,5 +1,9 @@
 # Revision history for demangler
 
+## 1.3.1.0 -- 2023.11.12
+
+* Added support for demangling expressions.
+
 ## 1.3.0.0 -- 2023.11.09
 
 * Added `functionName` accessor to retrieve the name portions only of a function
