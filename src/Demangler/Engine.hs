@@ -165,7 +165,7 @@ optional' o i = (o i >>= rmap ((i ^. nVal,) . Just)) <|> rmap (,Nothing) i
 a >&=> b = \i -> do x <- a i
                     y <- b x
                     rmap ((x ^. nVal,)) y
-infix 2 >&=>
+infixl 2 >&=>
 
 insert :: b -> Next a b
 insert v = pure . (nVal .~ v)
