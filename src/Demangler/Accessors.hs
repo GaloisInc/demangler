@@ -41,7 +41,7 @@ functionName :: Result -> Maybe (NEL.NonEmpty Text)
 functionName (d,c) =
   case d of
     Original i -> Just $ contextStr c i :| []
-    Encoded e -> resolveCtorDtor <$> (getEnc $ traceShowId e)
+    Encoded e -> resolveCtorDtor <$> getEnc e
     VendorExtended e _ -> getEnc e
   where
     resolveCtorDtor = \case
