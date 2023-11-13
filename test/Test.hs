@@ -52,7 +52,7 @@ demangleTests testInputs = describe "Demangle tests" $
 demangleTestSet :: (String, [(Text, Text, [Text])]) -> Spec
 demangleTestSet (inpFile, inpData) =
   describe inpFile $
-  do describe "Individually" $ sequence_ (mkTest <$> inpData)
+  do describe "Solo" $ sequence_ (mkTest <$> inpData)
      describe "Batched" $ batchTest inpData
 
 
