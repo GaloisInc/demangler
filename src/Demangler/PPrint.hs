@@ -188,8 +188,8 @@ instance {-# OVERLAPPABLE #-}
     case n of
       SourceName i [] -> sayable @saytag $ WC i c
       SourceName i tags -> WC i c &+ ctxLst' tags c ""
-      OperatorName op [] -> sayable @saytag $ WC op c
-      OperatorName op tags -> WC op c &+ ctxLst' tags c ""
+      OperatorName op [] -> t'"operator" &+ WC op c
+      OperatorName op tags -> t'"operator" &+ WC op c &+ ctxLst' tags c ""
       CtorDtorName cd -> sayable @saytag $ WC cd c
       StdSubst subs -> sayable @saytag $ WC subs c
       ModuleNamed mn uqn -> ctxLst' mn c "" &+ WC uqn c
@@ -266,12 +266,17 @@ instance {-# OVERLAPPABLE #-}
   ) =>  Sayable saytag (WithContext Operator) where
   sayable (WC op c) =
     case lookup op opTable of
-      Just (_, (_, o)) -> t'"operator" &+ o
+      Just (_, (_, o)) -> sayable @saytag o
       Nothing ->
+        -- TODO: if these are printed as part of an expression rather than an
+        -- UnqualifiedName, the prefix space will be wrong (the latter prints
+        -- "operator" to name the function whereas the former just prints the
+        -- operation).  If this is an issue, probably needs to be a flag in
+        -- WithContext to indicate if this is an expression or not.
         case op of
-          OpCast ty -> t'"operator" &- WC ty c
-          OpString snm -> sayable @saytag $ WC snm c
-          OpVendor n snm -> t'"vendor" &- n &- WC snm c
+          OpCast ty -> ' ' &+ WC ty c
+          OpString snm -> ' ' &+ WC snm c
+          OpVendor n snm -> t'"vendor" &- n &- WC snm c  -- ?
           _ -> cannotSay Demangler "sayable"
                [ "Operator not in opTable or with a specific override:"
                , show op
@@ -300,6 +305,7 @@ instance {-# OVERLAPPABLE #-}
       PrefixDeclType dt prefixr -> WC dt c &+ WC prefixr c
       PrefixClosure cp -> sayable @saytag $ WC cp c -- ??
       Prefix prefixr -> sayable @saytag $ WC prefixr c
+
 
 instance {-# OVERLAPPABLE #-}
   $(sayableConstraints ''PrefixR
@@ -386,10 +392,66 @@ instance {-# OVERLAPPABLE #-}
   ) => Sayable saytag (WithContext Expression) where
   sayable (WC e c) =
     case e of
-      ExprPack expr -> sayable @saytag $ WC expr c
+      ExprUnary op expr -> WC op c &+ WC expr c
+      ExprBinary op expr1 expr2 -> WC expr1 c &+ WC op c &+ WC expr2 c
+      ExprTrinary op expr1 expr2 expr3 ->
+        WC expr1 c &- WC op c &- WC expr2 c &- ':' &- WC expr3 c
+      ExprPfxPlus expr -> t'"++" &+ WC expr c
+      ExprPfxMinus expr -> t'"--" &+ WC expr c
+      ExprCall (exprc :| args) -> WC exprc c &+ '(' &+ ctxLst args c &+ ')'
+      ExprConvert1 ty expr -> '(' &+ WC ty c &+ ')' &+ WC expr c
+      ExprConvertSome ty exprs -> '(' &+ WC ty c &+ t'")(" &+ ctxLst exprs c &+ ')'
+      ExprConvertInit ty brexprs -> WC ty c &+ '{' &+ ctxLst brexprs c &+ '}'
+      ExprBracedInit brexprs -> '{' &+ ctxLst brexprs c &+ '}'
+      ExprNew gs exprs ty -> t'"new (" &+ ctxLst exprs c &+ ')'
+                             &- (if gs then "::" else t'"") &+ WC ty c
+      ExprNewInit gs exprs ty i -> t'"new (" &+ ctxLst exprs c &+ ')'
+                                   &- (if gs then "::" else t'"") &+ WC ty c
+                                   &- '(' &+ WC i c &+ ')'
+      ExprNewArray gs exprs ty -> t'"new[] (" &+ ctxLst exprs c &+ ')'
+                                  &- (if gs then "::" else t'"") &+ WC ty c
+      ExprNewInitArray gs exprs ty i -> t'"new[] (" &+ ctxLst exprs c &+ ')'
+                                        &- (if gs then "::" else t'"") &+ WC ty c
+                                        &- '(' &+ WC i c &+ ')'
+      ExprDel gs expr -> t'"delete" &- (if gs then "::" else t'"") -- ??
+                         &+ WC expr c
+      ExprDelArray gs expr -> t'"delete[]" &- (if gs then "::" else t'"") -- ??
+                              &+ WC expr c
+      ExprDynamicCast ty expr -> t'"dynamic_cast<" &+ WC ty c &+ t'">("
+                                 &+ WC expr c &+ ')'
+      ExprStaticCast ty expr -> t'"static_cast<" &+ WC ty c &+ t'">("
+                                &+ WC expr c &+ ')'
+      ExprConstCast ty expr -> t'"const_cast<" &+ WC ty c &+ t'">("
+                               &+ WC expr c &+ ')'
+      ExprReinterpretCast ty expr -> t'"reinterpret_cast<" &+ WC ty c &+ t'">("
+                                     &+ WC expr c &+ ')'
+      ExprTypeIdType ty -> t'"typeid(" &+ WC ty c &+ ')'
+      ExprTypeId expr -> t'"typeid(" &+ WC expr c &+ ')'
+      ExprSizeOfType ty -> t'"sizeof(" &+ WC ty c &+ ')'
+      ExprSizeOf expr -> t'"sizeof(" &+ WC expr c &+ ')'
+      ExprAlignOfType ty -> t'"alignof(" &+ WC ty c &+ ')'
+      ExprAlignOf expr -> t'"alignof(" &+ WC expr c &+ ')'
+      ExprNoException expr -> t'"noexcept(" &+ WC expr c &+ ')'
       ExprTemplateParam tp -> sayable @saytag $ WC tp c
+      ExprFunctionParam fp -> sayable @saytag $ WC fp c
+      ExprField expr urn -> WC expr c &+ '.' &+ WC urn c
+      ExprFieldPtr expr urn -> WC expr c &+ t'"->" &+ WC urn c
+      ExprFieldExpr baseExp fieldExp -> WC baseExp c &+ t'".*" &+ WC fieldExp c
+      ExprSizeOfTmplParamPack tp -> t'"sizeof...(" &+ WC tp c &+ ')'
+      ExprSizeOfFuncParamPack fp -> t'"sizeof...(" &+ WC fp c &+ ')'
+      ExprSizeOfCapturedTmplParamPack tas -> t'"sizeof...(" &+ ctxLst tas c &+ ')'
+      ExprPack expr -> WC expr c &+ t'"..."
+      ExprUnaryLeftFold op expr  -> '(' &+ t'"..." &- WC op c &- WC expr c &+ ')'
+      ExprUnaryRightFold op expr -> '(' &+ WC expr c &- WC op c &- t'"..." &+ ')'
+      ExprBinaryLeftFold op exprL exprR  ->
+        '(' &+ WC exprL c &- WC op c &- t'"..." &- WC op c &- WC exprR c &+ ')'
+      ExprBinaryRightFold op exprL exprR ->
+        '(' &+ WC exprL c &- WC op c &- t'"..." &- WC op c &- WC exprR c &+ ')'
+      ExprThrow expr -> t'"throw" &- WC expr c
+      ExprReThrow -> sayable @saytag $ t'"throw"
+      ExprVendorExtended sn tas -> WC sn c &+ '<' &+ ctxLst tas c &+ '>'
+      ExprUnresolvedName urn -> sayable @saytag $ WC urn c
       ExprPrim pe -> sayable @saytag $ WC pe c
-
 
 instance {-# OVERLAPPABLE #-}
   $(sayableConstraints ''ExprPrimary
@@ -413,6 +475,95 @@ instance {-# OVERLAPPABLE #-}
       DirectLit ty -> '(' &+ WC ty c &+ t'")NULL"  -- except String?
       NullPtrTemplateArg ty -> '(' &+ WC ty c &+ t'")0"
       ExternalNameLit enc -> sayable @saytag $ WC enc c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''BracedExpression
+   ) => Sayable saytag (WithContext BracedExpression) where
+  sayable (WC be c) =
+    case be of
+      BracedExpr e -> sayable @saytag $ WC e c
+      BracedFieldExpr sn be' -> '.' &+ WC sn c &+ WC be' c
+      BracedIndexExpr ixe be' ->
+        '[' &+ WC ixe c &+ ']' &+ '=' &+ '(' &+ WC be' c &+ ')'
+      BracedRangedExpr sr er be' -> '[' &+ WC sr c &- t'"..." &- WC er c &+ ']'
+                                    &- '=' &- WC be' c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''InitializerExpr
+   ) => Sayable saytag (WithContext InitializerExpr) where
+  sayable (WC (Initializer ies) c) = ctxLst ies c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''FunctionParam
+   ) => Sayable saytag (WithContext FunctionParam) where
+  sayable (WC fp c) =
+    case fp of
+      FP_This -> sayable @saytag $ t'"this"
+      FP_ ty -> sayable @saytag $ WC ty c -- ??
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''UnresolvedName
+   ) => Sayable saytag (WithContext UnresolvedName) where
+  sayable (WC urn c) =
+    case urn of
+      URN_Base True burn -> t'"::" &+ WC burn c
+      URN_Base False burn -> sayable @saytag $ WC burn c
+      URNScopedRef urt burn -> WC urt c &+ t'"::" &+ WC burn c
+      URNSubScopedRef urt urqls burn -> WC urt c &+ t'"::"
+                                        &+ ctxLst' urqls c (t'"::")
+                                        &+ t'"::" &+ WC burn c
+      URNQualRef True urqls burn -> t'"::"
+                                    &+ ctxLst' urqls c (t'"::")
+                                    &+ t'"::" &+ WC burn c
+      URNQualRef False urqls burn -> ctxLst' urqls c (t'"::")
+                                     &+ t'"::" &+ WC burn c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''BaseUnresolvedName
+   ) => Sayable saytag (WithContext BaseUnresolvedName) where
+  sayable (WC urn c) =
+    case urn of
+      BUName sn Nothing -> sayable @saytag $ WC sn c
+      BUName sn (Just targs) -> WC sn c &+ WC targs c
+      BUOnOperator op -> sayable @saytag $ WC op c
+      BUOnOperatorT op targs -> WC op c &+ WC targs c -- ?
+      BUDestructorUnresolvedType urt -> '~' &+ WC urt c
+      BUDestructorSimpleId sn Nothing -> '~' &+ WC sn c
+      BUDestructorSimpleId sn (Just targs) -> '~' &+ WC sn c &+ WC targs c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''UnresolvedType
+   ) => Sayable saytag (WithContext UnresolvedType) where
+  sayable (WC urt c) =
+    case urt of
+      URTTemplate tp Nothing -> sayable @saytag $ WC tp c
+      URTTemplate tp (Just targs) -> WC tp c &+ WC targs c
+      URTDeclType dt -> sayable @saytag $ WC dt c
+      URTSubstPrefix pfx -> sayable @saytag $ WC pfx c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''UnresolvedQualifierLevel
+   ) => Sayable saytag (WithContext UnresolvedQualifierLevel) where
+  sayable (WC urq c) =
+    case urq of
+      URQL sn Nothing -> sayable @saytag $ WC sn c
+      URQL sn (Just targs) -> WC sn c &+ WC targs c
+
+
+instance {-# OVERLAPPABLE #-}
+  $(sayableConstraints ''DeclType
+   ) => Sayable saytag (WithContext DeclType) where
+  sayable (WC dt c) =
+    case dt of
+      DeclType expr -> t'"decltype(" &+ WC expr c &+ ')'
+      DeclTypeExpr expr -> t'"decltype(" &+ WC expr c &+ ')'
 
 
 instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext ClosurePrefix) where
@@ -481,6 +632,7 @@ instance {-# OVERLAPPABLE #-}
         -- does not visibly decorate these.
         ctxLst ts c
       StdType stdTy -> sayable @saytag $ WC stdTy c
+      DeclType_ dt -> sayable @saytag $ WC dt c
 
 
 sayFunctionType :: Type_ -> Text -> Context -> Saying saytag
@@ -561,3 +713,4 @@ instance {-# OVERLAPPABLE #-}
       SC_UQName _ n -> t'"SC_UN" &- WC n c
       SC_Prefix p -> t'"SC_PR" &- WC p c
       SC_TemplatePrefix tp -> t'"SC_TP" &- WC tp c
+      SC_UnresolvedType urt -> t'"SC_URT" &- WC urt c

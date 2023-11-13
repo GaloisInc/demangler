@@ -89,6 +89,9 @@ ret' a b = ret b a
 rmap :: Applicative f => (a -> b) -> NextArg a -> f (NextArg b)
 rmap f i = ret i $ f (i ^. nVal)
 
+rapply :: Applicative f => NextArg (a -> b, a) -> f (NextArg b)
+rapply = rmap $ uncurry ($)
+
 
 --------------------
 -- Helpers

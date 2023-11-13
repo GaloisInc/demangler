@@ -41,9 +41,13 @@ functionName :: Result -> Maybe (NEL.NonEmpty Text)
 functionName (d,c) =
   case d of
     Original i -> Just $ contextStr c i :| []
-    Encoded e -> getEnc e
+    Encoded e -> resolveCtorDtor <$> (getEnc $ traceShowId e)
     VendorExtended e _ -> getEnc e
   where
+    resolveCtorDtor = \case
+      ("{{CTOR}" :| r@(nm : _)) -> nm :| r
+      ("{{DTOR}" :| r@(nm : _)) -> "~" <> nm :| r
+      o -> o
     getEnc = \case
       EncFunc (FunctionName fn) _rty _argtys -> getName fn
       EncStaticFunc (FunctionName fn) _rty _argtys -> getName fn
@@ -78,14 +82,7 @@ functionName (d,c) =
                          SubStdType BasicIOStream -> [ "iostream", "std" ]
       ModuleNamed _ uqn -> getUQN uqn
     getNestedNm = \case
-      NestedName pfx uqn _ _ -> case getPfx pfx of
-                                  [] -> Just $ NEL.fromList $ getUQN uqn
-                                  fx@(p:_) ->
-                                    case getUQN uqn of
-                                      ("{{CTOR}":[]) -> Just $ p :| fx
-                                      ("{{DTOR}":[]) -> Just $ ("~" <> p) :| fx
-                                      (o:os) -> Just $ o :| os <> fx
-                                      [] -> error "unexpected nestedname uqn"
+      NestedName pfx uqn _ _ -> NEL.nonEmpty $ getUQN uqn <> getPfx pfx
       NestedTemplateName tmplpfx _tmplArgs _ _ -> NEL.nonEmpty $ getTmplPfx tmplpfx
     getPfx = \case
       PrefixTemplateParam _tmplParam r -> getPfxR r

@@ -208,15 +208,10 @@ local_name :: AnyNext Name
 local_name = match "Z"
              >=> function_encoding
              >=> match "E"
-             >=> asum' [ match "s"
-                         >=> rmap StringLitName
-                         >=> optional' discriminator
-                         >=> rmap (uncurry ($))
-                       , rmap LocalName
-                         >&=> name
-                         >=> rmap (uncurry ($))
-                         >=> optional' discriminator
-                         >=> rmap (uncurry ($))
+             >=> asum' [ match "s" >=> rmap StringLitName
+                         >=> optional' discriminator >=> rapply
+                       , rmap LocalName >&=> name >=> rapply
+                         >=> optional' discriminator >=> rapply
                        ]
 
 
@@ -323,8 +318,8 @@ substitutionPrefixR :: Next Substitution PrefixR
 substitutionPrefixR = rmap (($ PrefixEnd) . PrefixUQName . StdSubst)
 
 decltype :: AnyNext DeclType
-decltype = asum' [ match "Dt" >=> expression >=> match "E" >=> tbd "decltype1"
-                 , match "DT" >=> expression >=> match "E" >=> tbd "decltype2"
+decltype = asum' [ match "Dt" >=> expression >=> match "E" >=> rmap DeclType
+                 , match "DT" >=> expression >=> match "E" >=> rmap DeclTypeExpr
                  ]
 
 closure_prefix :: AnyNext ClosurePrefix
@@ -491,7 +486,7 @@ type_parser =
                   -- , pointer_to_member_type
                 , template_template_param >&=> template_args
                   >=> rmap (uncurry Template)
-                  -- , decltype
+                , decltype >=> rmap DeclType_
                 -- This one is tricky: it's recursive, but then binds the
                 -- (possibly) multiple returned recursion types into a single
                 -- type.
@@ -705,7 +700,7 @@ template_arg :: AnyNext TemplateArg
 template_arg =
   asum' [ type_ >=> rmap TArgType >=> canSubstTemplateArg
         , match "X" >=> expression >=> match "E" >=> rmap TArgExpr
-        , expression_primary >=> rmap TArgSimpleExpr >=> canSubstTemplateArg
+        , expr_primary >=> rmap TArgSimpleExpr >=> canSubstTemplateArg
         , match "J"
           >=> (\i -> do let locked = i ^. nTmplSubsLock
                         r <- many' template_arg . rdiscard $ i & nTmplSubsLock .~ True
@@ -723,14 +718,98 @@ template_param =
   >=> substituteTemplateParam
 
 expression :: AnyNext Expression
-expression = asum' [ match "sp" >=> expression >=> rmap ExprPack
-                   , template_param >=> rmap ExprTemplateParam
-                   , expression_primary >=> rmap ExprPrim
-                   , tbd "expression"
-                   ]
+expression =
+  let opMatch (o,(a,(t,_))) i = do m <- match t i
+                                   e1 <- expression m
+                                   case a of
+                                     Unary -> rmap (ExprUnary o) e1
+                                     Binary -> rmap (ExprBinary o) e1
+                                               >>= expression
+                                     Trinary -> rmap (ExprTrinary o) e1
+                                                >>= expression
+                                                >>= expression
+                                     _ -> Nothing
+      binary_op = operator_name
+                  >=> \i -> case lookup (i^.nVal) opTable of
+                              Just (Binary, _) -> pure i -- $ i^.nVal
+                              _ -> Nothing
+      unary_op = operator_name
+                  >=> \i -> case lookup (i^.nVal) opTable of
+                              Just (Unary, _) -> pure i
+                              _ -> Nothing
+      rmap2 = rmap . uncurry
+      isGS = isJust . snd
+  in asum'
+     ((opMatch <$> opTable)
+      <>
+      [ match "pp_" >=> expression >=> rmap ExprPfxPlus
+      , match "mm_" >=> expression >=> rmap ExprPfxMinus
+      , match "cl" >=> some' expression >=> rmap ExprCall
+      , match "cv" >=> type_ >&=> expression
+        >=> match "E"  -- n.b. missing from https://itanium-cxx-abi.github.io
+        >=> rmap2 ExprConvert1
+      , match "cv" >=> type_ >=> match "_" >&=> some' expression
+        >=> rmap2 ExprConvertSome
+      , match "tl" >=> type_ >&=> many' braced_expression . rdiscard
+        >=> match "E" >=> rmap2 ExprConvertInit
+      , match "il" >=> many' braced_expression . rdiscard >=> rmap ExprBracedInit
+      , optional' (match "gs") >=> match "nw"
+        >&=> many' expression . rdiscard
+        >=> match "_" >&=> type_ >=> match "E"
+        >=> rmap2 (uncurry (ExprNew . isGS))
+      , optional' (match "gs") >=> match "nw" >=> rmap (ExprNewInit . isGS)
+        >&=> many' expression . rdiscard
+        >=> match "_" >&=> type_ >&=> initializer
+        >=> rmap2 (uncurry (uncurry ($)))
+      , optional' (match "gs") >=> match "na"
+        >&=> many' expression . rdiscard
+        >=> match "_" >&=> type_ >=> match "E"
+        >=> rmap2 (uncurry (ExprNewArray . isGS))
+      , optional' (match "gs") >=> match "na" >=> rmap (ExprNewInitArray . isGS)
+        >&=> many' expression . rdiscard
+        >=> match "_" >&=> type_ >&=> initializer
+        >=> rmap2 (uncurry (uncurry ($)))
+      , optional' (match "gs") >=> match "dl" >&=> expression
+        >=> rmap2 (ExprDel . isGS)
+      , optional' (match "gs") >=> match "da" >&=> expression
+        >=> rmap2 (ExprDelArray . isGS)
+      , match "dc" >=> type_ >&=> expression >=> rmap2 ExprDynamicCast
+      , match "sc" >=> type_ >&=> expression >=> rmap2 ExprStaticCast
+      , match "cc" >=> type_ >&=> expression >=> rmap2 ExprConstCast
+      , match "rc" >=> type_ >&=> expression >=> rmap2 ExprReinterpretCast
+      , match "ti" >=> type_ >=> rmap ExprTypeIdType
+      , match "te" >=> expression >=> rmap ExprTypeId
+      , match "st" >=> type_ >=> rmap ExprSizeOfType
+      , match "sz" >=> expression >=> rmap ExprSizeOf
+      , match "at" >=> type_ >=> rmap ExprAlignOfType
+      , match "az" >=> expression >=> rmap ExprAlignOf
+      , match "nx" >=> expression >=> rmap ExprNoException
+      , template_param >=> rmap ExprTemplateParam
+      , function_param >=> rmap ExprFunctionParam
+      , match "dt" >=> expression >&=> unresolved_name >=> rmap2 ExprField
+      , match "pt" >=> expression >&=> unresolved_name >=> rmap2 ExprFieldPtr
+      , match "ds" >=> expression >&=> expression >=> rmap2 ExprFieldExpr
+      , match "sZ" >=> template_param >=> rmap ExprSizeOfTmplParamPack
+      , match "sZ" >=> function_param >=> rmap ExprSizeOfFuncParamPack
+      , match "sP" >=> many' template_arg . rdiscard >=> match "E"
+        >=> rmap ExprSizeOfCapturedTmplParamPack
+      , match "sp" >=> expression >=> rmap ExprPack
+      , match "fl" >=> unary_op >&=> expression >=> rmap2 ExprUnaryLeftFold
+      , match "fr" >=> unary_op >&=> expression >=> rmap2 ExprUnaryRightFold
+      , match "fL" >=> binary_op >&=> expression >=> rmap2 ExprBinaryLeftFold
+        >&=> expression >=> rapply
+      , match "fR" >=> binary_op >&=> expression >=> rmap2 ExprBinaryRightFold
+        >&=> expression >=> rapply
+      , match "tw" >=> expression >=> rmap ExprThrow
+      , match "tr" >=> ret' ExprReThrow
+      , match "u" >=> source_name >&=> many' template_arg . rdiscard
+        >=> rmap2 ExprVendorExtended
+      , unresolved_name >=> rmap ExprUnresolvedName
+      , expr_primary >=> rmap ExprPrim
+      ])
 
-expression_primary :: AnyNext ExprPrimary
-expression_primary =
+expr_primary :: AnyNext ExprPrimary
+expr_primary =
   let toFloat w f = read (show w <> "." <> show f)
       floatLit ty w p = FloatLit (ty ^. nVal) $ toFloat (w ^.nVal) p
       complexLit ty w p iw ip =
@@ -753,3 +832,66 @@ expression_primary =
     >=> asum' [ type_ >=> withType >=> match "E"
               , match "_Z" >=> encoding >=> match "E" >=> rmap ExternalNameLit
               ]
+
+braced_expression :: AnyNext BracedExpression
+braced_expression = asum' [ expression >=> rmap BracedExpr
+                          , match "di" >=> source_name >&=> braced_expression
+                            >=> rmap (uncurry BracedFieldExpr)
+                          , match "dx" >=> expression >&=> braced_expression
+                            >=> rmap (uncurry BracedIndexExpr)
+                          , match "dX" >=> expression >&=> expression
+                            >=> rmap (uncurry BracedRangedExpr)
+                            >&=> braced_expression >=> rapply
+                          ]
+
+initializer :: AnyNext InitializerExpr
+initializer = match "pi" >=> many' expression . rdiscard >=> match "E"
+              >=> rmap Initializer
+
+function_param :: AnyNext FunctionParam
+function_param = asum' [ match "fpT" >=> rmap (const FP_This)
+                       , match "fp" >=> tbd "function param"
+                       , match "fL" >=> tbd "function param l"
+                       ]
+
+unresolved_name :: AnyNext UnresolvedName
+unresolved_name =
+  asum' [ optional' (match "gs")
+          >&=> base_unresolved_name
+          >=> rmap (uncurry (URN_Base . isJust . snd))
+        , match "sr" >=> unresolved_type >&=> base_unresolved_name
+          >=> rmap (uncurry URNScopedRef)
+        , match "srN" >=> unresolved_type >=> rmap URNSubScopedRef
+          >&=> some' unresolved_qualifier_level >=> match "E" >=> rapply
+          >&=> base_unresolved_name >=> rapply
+        , optional' (match "gs")
+          >&=> match "sr" >=> rmap (URNQualRef . isJust . snd . fst)
+          >&=> some' unresolved_qualifier_level >=> match "E" >=> rapply
+          >&=> base_unresolved_name >=> rapply
+        ]
+
+base_unresolved_name :: AnyNext BaseUnresolvedName
+base_unresolved_name =
+  asum' [ source_name >=> optional' template_args >=> rmap (uncurry BUName)
+        , match "on" >=> operator_name >&=> template_args
+          >=> rmap (uncurry BUOnOperatorT)
+        , match "on" >=> operator_name >=> rmap BUOnOperator
+        , match "dn" >=> asum' [ unresolved_type
+                                 >=> rmap BUDestructorUnresolvedType
+                               , source_name >=> optional' template_args
+                                 >=> rmap (uncurry BUDestructorSimpleId)
+                               ]
+        ]
+
+unresolved_type :: AnyNext UnresolvedType
+unresolved_type i =
+  (asum' [ template_param >=> optional' template_args >=> rmap (uncurry URTTemplate)
+         , decltype >=> rmap URTDeclType
+         ]
+    i >>= canSubstUnresolvedType)
+  <|> (substitution i
+       >>= substituteUnresolvedType (tbd "substituteUnresolvedType"))
+
+unresolved_qualifier_level :: AnyNext UnresolvedQualifierLevel
+unresolved_qualifier_level =
+  source_name >=> optional' template_args >=> rmap (uncurry URQL)

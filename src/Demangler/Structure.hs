@@ -194,6 +194,7 @@ data Type_ = BaseType BaseType
            | Cpp11PackExpansion (NonEmpty Type_)
            | StdType StdType
            | ArrayType ArrayBound Type_
+           | DeclType_ DeclType
   deriving (Eq, Show)
 
 data ArrayBound = NumBound Int
@@ -284,10 +285,54 @@ data TemplateArg = TArgType Type_
 
 type TemplateParam = TemplateArg
 
-data Expression = ExprPack Expression
+data Expression = ExprUnary Operator Expression
+                | ExprBinary Operator Expression Expression
+                | ExprTrinary Operator Expression Expression Expression
+                | ExprPfxPlus Expression
+                | ExprPfxMinus Expression
+                | ExprCall (NonEmpty Expression) -- call target :| [args]
+                | ExprConvert1 Type_ Expression
+                | ExprConvertSome Type_ (NonEmpty Expression)
+                | ExprConvertInit Type_ [BracedExpression]
+                | ExprBracedInit [BracedExpression]
+                | ExprNew GlobalScope [Expression] Type_
+                | ExprNewInit GlobalScope [Expression] Type_ InitializerExpr
+                | ExprNewArray GlobalScope [Expression] Type_
+                | ExprNewInitArray GlobalScope [Expression] Type_ InitializerExpr
+                | ExprDel GlobalScope Expression
+                | ExprDelArray GlobalScope Expression
+                | ExprDynamicCast Type_ Expression
+                | ExprStaticCast Type_ Expression
+                | ExprConstCast Type_ Expression
+                | ExprReinterpretCast Type_ Expression
+                | ExprTypeIdType Type_
+                | ExprTypeId Expression
+                | ExprSizeOfType Type_
+                | ExprSizeOf Expression
+                | ExprAlignOfType Type_
+                | ExprAlignOf Expression
+                | ExprNoException Expression
                 | ExprTemplateParam TemplateParam
+                | ExprFunctionParam FunctionParam
+                | ExprField Expression UnresolvedName
+                | ExprFieldPtr Expression UnresolvedName
+                | ExprFieldExpr Expression Expression
+                | ExprSizeOfTmplParamPack TemplateParam
+                | ExprSizeOfFuncParamPack FunctionParam
+                | ExprSizeOfCapturedTmplParamPack [TemplateArg]
+                | ExprPack Expression
+                | ExprUnaryLeftFold Operator Expression
+                | ExprUnaryRightFold Operator Expression
+                | ExprBinaryLeftFold Operator Expression Expression
+                | ExprBinaryRightFold Operator Expression Expression
+                | ExprThrow Expression
+                | ExprReThrow
+                | ExprVendorExtended SourceName [TemplateArg]
+                | ExprUnresolvedName UnresolvedName
                 | ExprPrim ExprPrimary
   deriving (Eq, Show)
+
+type GlobalScope = Bool
 
 data ExprPrimary = IntLit Type_ Int
                  | FloatLit Type_ Float
@@ -297,8 +342,54 @@ data ExprPrimary = IntLit Type_ Int
                  | ExternalNameLit Encoding
   deriving (Eq, Show)
 
+data BracedExpression = BracedExpr Expression
+                      | BracedFieldExpr SourceName BracedExpression -- .name = expr
+                      | BracedIndexExpr Expression BracedExpression -- [idx] = expr
+                      | BracedRangedExpr Expression Expression BracedExpression
+                        -- [expr ... expr] = expr
+  deriving (Eq, Show)
+
+data InitializerExpr = Initializer [Expression]
+  deriving (Eq, Show)
+
+data FunctionParam = FP_This
+                   | FP_ Type_ -- XXX TBD
+  deriving (Eq, Show)
+
+data UnresolvedName = URN_Base GlobalScope BaseUnresolvedName
+                    | URNScopedRef UnresolvedType BaseUnresolvedName
+                    | URNSubScopedRef UnresolvedType
+                      UnresolvedQualifierLevels BaseUnresolvedName
+                    | URNQualRef GlobalScope
+                      UnresolvedQualifierLevels BaseUnresolvedName
+  deriving (Eq, Show)
+
+type UnresolvedQualifierLevels = NonEmpty UnresolvedQualifierLevel
+
+data BaseUnresolvedName = BUName SourceName (Maybe TemplateArgs)
+                        | BUOnOperatorT Operator TemplateArgs
+                        | BUOnOperator Operator
+                        | BUDestructorUnresolvedType UnresolvedType
+                        | BUDestructorSimpleId SourceName (Maybe TemplateArgs)
+  deriving (Eq, Show)
+
+
+data UnresolvedType = URTTemplate TemplateParam (Maybe TemplateArgs)
+                    | URTDeclType DeclType
+                    | URTSubstPrefix Prefix -- never parsed: subst insertion
+  deriving (Eq, Show)
+
+
+data UnresolvedQualifierLevel = URQL SourceName (Maybe TemplateArgs)
+  deriving (Eq, Show)
+
 type ClosurePrefix = () -- XXX TBD
-type DeclType = () -- XXX TBD
+
+
+data DeclType = DeclType Expression
+              | DeclTypeExpr Expression
+  deriving (Eq, Show)
+
 
 -- | Table of builtin types as the internal BaseType representation, followed by
 -- a tuple of strings.  The first string is the reference to this type in a
@@ -348,6 +439,7 @@ builtinTypeTable =
   ]
 
 data Arity = Unary | Binary | Trinary | NoArity
+  deriving Eq
 
 opTable :: [ (Operator, (Arity, (Text, Text))) ]
 opTable =
@@ -416,4 +508,5 @@ data SubsCandidate = SC_Type Type_
                      -- ^ Bool is True for std:: namespace prefix
                    | SC_Prefix Prefix
                    | SC_TemplatePrefix TemplatePrefix
+                   | SC_UnresolvedType UnresolvedType
   deriving (Eq, Show)

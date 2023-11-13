@@ -17,6 +17,7 @@ module Demangler.Substitution
   , substituteTemplatePrefix
   , substituteType
   , stdSubstToType
+  , substituteUnresolvedType
   -- * When a subtitution candidate has been parsed, it is recorded here
   , canSubstUnscopedTemplateName
   , canSubstPrefix
@@ -25,6 +26,7 @@ module Demangler.Substitution
   , canSubstTemplatePrefix
   , canSubstType
   , canSubstTypes
+  , canSubstUnresolvedType
   , dropLastSubst
   )
 where
@@ -198,8 +200,17 @@ prefixToType pfx =
             mkntn tpfx = NestedTemplateName tpfx ta [] Nothing
         in NameNested . mkntn <$> tmpltpfx
 
+substituteUnresolvedType :: Next Substitution UnresolvedType
+                         -> Next Substitution' UnresolvedType
+substituteUnresolvedType direct i =
+  case getSubst i of
+    Right (Just (SC_Prefix p)) -> ret i $ URTSubstPrefix p
+    Right (Just (SC_UnresolvedType urt)) -> ret i urt
+    Right x -> cannot Demangler "substituteUnresolvedType"
+               [ "Cannot convert to an unresolved type: " <> show x ]
+    Left s -> direct =<< ret i s
 
-substitutePrefix :: (Next Substitution Prefix) -> Next Substitution' Prefix
+substitutePrefix :: Next Substitution Prefix -> Next Substitution' Prefix
 substitutePrefix direct i =
   case getSubst i of
     Right (Just (SC_Prefix p)) -> ret i p
@@ -304,6 +315,9 @@ canSubstTypes :: Next (NEL.NonEmpty Type_) (NEL.NonEmpty Type_)
 canSubstTypes i =
   let subT i' ty = canSubst (SC_Type $ ty) i'
   in foldM subT i (i ^. nVal)
+
+canSubstUnresolvedType :: Next UnresolvedType UnresolvedType
+canSubstUnresolvedType i = canSubst (SC_UnresolvedType $ i ^. nVal) i
 
 canSubstTemplatePrefix :: Next TemplatePrefix TemplatePrefix
 canSubstTemplatePrefix i = canSubst (SC_TemplatePrefix $ i ^. nVal) i
