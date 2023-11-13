@@ -206,7 +206,7 @@ substitutePrefix direct i =
     Right o -> invalidSubst "Prefix" i o
     Left s -> direct =<< ret i s
 
-substitutePrefixR :: (Next Substitution PrefixR) -> Next Substitution' PrefixR
+substitutePrefixR :: Next Substitution PrefixR -> Next Substitution' PrefixR
 substitutePrefixR direct i =
   case getSubst i of
     Right (Just (SC_Type (ClassUnionStructEnum (UnscopedName False uqn)))) ->
