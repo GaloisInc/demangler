@@ -57,7 +57,8 @@ functionName (d,c) =
     getUQN = \case
       SourceName (SrcName i) _ -> [contextStr c i]
       OperatorName op _ ->
-        [maybe (T.pack $ show op) (("operator" <>) . snd) $ lookup op opTable]
+        [maybe (T.pack $ show op) (("operator" <>) . snd . snd)
+         $ lookup op opTable]
       CtorDtorName ctd -> case ctd of
                             CompleteCtor -> ["{{CTOR}"]
                             BaseCtor -> ["{{CTOR}"]

@@ -358,7 +358,7 @@ module_name = match "W"
 
 operator_name :: AnyNext Operator
 operator_name =
-  let opMatch (o,(t,_)) = match t >=> rmap (const o)
+  let opMatch (o,(_,(t,_))) = match t >=> rmap (const o)
   in asum' ((opMatch <$> opTable)
              <> [ match "cv" >=> type_ >=> rmap OpCast
                 , match "li" >=> source_name >=> rmap OpString

@@ -266,7 +266,7 @@ instance {-# OVERLAPPABLE #-}
   ) =>  Sayable saytag (WithContext Operator) where
   sayable (WC op c) =
     case lookup op opTable of
-      Just (_, o) -> t'"operator" &+ o
+      Just (_, (_, o)) -> t'"operator" &+ o
       Nothing ->
         case op of
           OpCast ty -> t'"operator" &- WC ty c
