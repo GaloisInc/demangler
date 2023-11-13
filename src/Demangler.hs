@@ -731,7 +731,7 @@ expression =
                                      _ -> Nothing
       binary_op = operator_name
                   >=> \i -> case lookup (i^.nVal) opTable of
-                              Just (Binary, _) -> pure i -- $ i^.nVal
+                              Just (Binary, _) -> pure i
                               _ -> Nothing
       unary_op = operator_name
                   >=> \i -> case lookup (i^.nVal) opTable of
