@@ -23,7 +23,7 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: build ${{ matrix.ghc-version }}
         shell: bash
-        run: nix build .#demangler.${{ matrix.ghc-version }}
+        run: nix build -L .#demangler.${{ matrix.ghc-version }}
   tests:
     runs-on: ubuntu-latest
     steps:
