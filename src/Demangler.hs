@@ -322,8 +322,8 @@ decltype = asum' [ match "Dt" >=> expression >=> match "E" >=> rmap DeclType
                  , match "DT" >=> expression >=> match "E" >=> rmap DeclTypeExpr
                  ]
 
-closure_prefix :: AnyNext ClosurePrefix
-closure_prefix = tbd "closure prefix"
+-- closure_prefix :: AnyNext ClosurePrefix
+-- closure_prefix = tbd "closure prefix"
 
 unqualified_name :: AnyNext UnqualifiedName
 unqualified_name =
