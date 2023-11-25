@@ -40,7 +40,6 @@ import           Data.Maybe
 import           Data.Sequence ( (|>), ViewR((:>)) )
 import qualified Data.Sequence as Seq
 
-import           Demangler.Context
 import           Demangler.Engine
 import           Demangler.Structure
 import           Demangler.PPrint ()
