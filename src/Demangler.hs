@@ -704,9 +704,12 @@ template_args = match "I"
 
 template_arg :: AnyNext TemplateArg
 template_arg =
-  asum' [ type_ >=> rmap TArgType >=> canSubstTemplateArg
+  -- n.b. must check expr_primary ('L') before type_ because type_ can be a class
+  -- name, which can be a name, which can be an unqualified name, which can be a
+  -- "[module_name] L ..."
+  asum' [ expr_primary >=> rmap TArgSimpleExpr >=> canSubstTemplateArg
+        , type_ >=> rmap TArgType >=> canSubstTemplateArg
         , match "X" >=> expression >=> match "E" >=> rmap TArgExpr
-        , expr_primary >=> rmap TArgSimpleExpr >=> canSubstTemplateArg
         , match "J"
           >=> (\i -> do let locked = i ^. nTmplSubsLock
                         r <- many' template_arg . rdiscard $ i & nTmplSubsLock .~ True
