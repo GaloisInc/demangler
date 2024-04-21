@@ -82,7 +82,7 @@ data UnqualifiedName = SourceName SourceName [ABI_Tag]
                      | CtorDtorName CtorDtor
                      | StdSubst Substitution
                      | ModuleNamed [ModuleName] UnqualifiedName
-                      --  | UnnamedTypeName ...  starts with "U"
+                     | UnnamedTypeName (Maybe Natural) -- Nothing = first instance
                      --  | StructuredBinding ...
   deriving (Eq, Show)
 

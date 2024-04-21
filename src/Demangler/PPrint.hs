@@ -17,6 +17,7 @@
 
 module Demangler.PPrint () where
 
+import           Control.Applicative
 import           Data.Char
 import           Data.List.NonEmpty ( NonEmpty((:|)) )
 import qualified Data.List.NonEmpty as NEL
@@ -201,6 +202,13 @@ instance {-# OVERLAPPABLE #-}
       CtorDtorName cd -> sayable @saytag $ WC cd c
       StdSubst subs -> sayable @saytag $ WC subs c
       ModuleNamed mn uqn -> ctxLst' mn c "" &+ WC uqn c
+      -- GCC c++filt style:
+      UnnamedTypeName Nothing -> t'"{unnamed type#1" &+ '}'
+      UnnamedTypeName (Just nt) -> t'"{unnamed type#" &+ nt + 2 &+ '}'
+      -- llvm-cxxfilt style:
+      -- UnnamedTypeName Nothing -> t'"'unnamed" &+ '\''
+      -- UnnamedTypeName (Just nt) -> t'"'unnamed" &+ nt &+ '\''
+
 
 instance {-# OVERLAPPABLE #-}
   $(sayableConstraints ''SourceName
@@ -232,14 +240,14 @@ instance {-# OVERLAPPABLE #-}
    ) =>  Sayable saytag (WithContext CtorDtor) where
   sayable (WC n c) =
     case n of
-      CompleteCtor -> 'c' &+ '1'
-      BaseCtor -> 'c' &+ '2'
-      CompleteAllocatingCtor -> 'c' &+ '3'
-      CompleteInheritingCtor t -> t'"ci1" &+ WC t c
-      BaseInheritingCtor t -> t'"ci2" &+ WC t c
-      DeletingDtor -> 'd' &+ '0'
-      CompleteDtor -> 'd' &+ '1'
-      BaseDtor -> 'd' &+ '2'
+      CompleteCtor -> '(' &+ ')'
+      BaseCtor -> '(' &+ ')'
+      CompleteAllocatingCtor -> '(' &+ ')'
+      CompleteInheritingCtor t -> WC t c &+ '(' &+ ')' -- ?
+      BaseInheritingCtor t -> WC t c &+ '(' &+ ')' -- ?
+      DeletingDtor -> '~' &+ '(' &+ ')'
+      CompleteDtor -> '~' &+ '(' &+ ')'
+      BaseDtor -> '~' &+ '(' &+ ')'
 
 instance {-# OVERLAPPABLE #-}
   $(sayableConstraints ''PrefixCDtor
@@ -250,9 +258,11 @@ instance {-# OVERLAPPABLE #-}
                   _ -> cannot Demangler "sayable"
                        [ "CTORDTOR UNK PFX: " <> show p ]
         pfxrLastUQName = \case
+          PrefixUQName (UnnamedTypeName _) PrefixEnd -> Nothing
+          PrefixUQName (UnnamedTypeName _) (PrefixTemplateArgs _ PrefixEnd) -> Nothing
           PrefixUQName unm PrefixEnd -> Just unm
           PrefixUQName unm (PrefixTemplateArgs _ PrefixEnd) -> Just unm
-          PrefixUQName _ sp -> pfxrLastUQName sp
+          PrefixUQName unm sp -> pfxrLastUQName sp <|> Just unm  -- [note UTC]
           PrefixTemplateArgs _ sp -> pfxrLastUQName sp
           PrefixEnd -> Nothing
     in case mb'ln of
@@ -266,7 +276,20 @@ instance {-# OVERLAPPABLE #-}
              DeletingDtor -> '~' &+ WC ln c
              CompleteDtor -> '~' &+ WC ln c
              BaseDtor -> '~' &+ WC ln c
-         Nothing -> t'"unk_" &+ WC n c -- unlikely... and will be wrong
+         Nothing -> sayable @saytag $ WC n c
+
+-- [Note UTC:] When printing a constructor or destructor that includes an
+-- UnnamedTypeName, there are differences between GCC's c++filt and LLVM's
+-- llvm-cxxfilt.  We adopt the former because the demangle tests use c++filt as
+-- an oracle, but it is possible to switch to the LLVM style (at compile time) by
+-- removing the alternative return of Just unm from the indicated
+--
+-- Example:
+--    _ZN3FooUt3_C2Ev is the base constructor for the 5th unnamed type
+--    in the Foo namespace.
+--
+--      c++filt _ZN3FooUt3_C2Ev -------> Foo::{unnamed type#5}::Foo()
+--      llvm-cxxfilt _ZN3FooUt3_C2Ev --> Foo::'unnamed3'::()'
 
 
 instance {-# OVERLAPPABLE #-}

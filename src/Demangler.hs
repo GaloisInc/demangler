@@ -342,6 +342,7 @@ base_uqn = asum' [ \i -> do op <- operator_name i
                  , source_name >&=> many' abi_tag . rdiscard
                    >=> rmap (uncurry SourceName)
                  , unnamed_type_name
+
                    -- , match "DC" i >>= some source_name >>= match "E"
                  ]
 
@@ -393,7 +394,11 @@ identifier i =
 
 
 unnamed_type_name :: AnyNext UnqualifiedName
-unnamed_type_name = tbd "unnamed_type_name"
+unnamed_type_name = match "Ut"
+                    >=> ret' UnnamedTypeName
+                    >=> optional' digits_num >=> rmap (fmap $ fmap toEnum)
+                    >=> rapply
+                    >=> match "_"
 
 -- | Parse the function argument (and return) types for a function.
 --

@@ -81,6 +81,8 @@ functionName (d,c) =
                          SubStdType BasicOStream -> [ "ostream", "std" ]
                          SubStdType BasicIOStream -> [ "iostream", "std" ]
       ModuleNamed _ uqn -> getUQN uqn
+      UnnamedTypeName _ ->
+        [T.pack "<impossible: unnamed type name cannot be a function name>"]
     getNestedNm = \case
       NestedName pfx uqn _ _ -> NEL.nonEmpty $ getUQN uqn <> getPfx pfx
       NestedTemplateName tmplpfx _tmplArgs _ _ -> NEL.nonEmpty $ getTmplPfx tmplpfx
