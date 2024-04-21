@@ -61,7 +61,16 @@ data NestedName = NestedName Prefix UnqualifiedName
   deriving (Eq, Show)
 
 type FunctionEntity = Coord
-type Discriminator = Coord
+
+-- The Discriminator is simply a non-negative number used to identify a
+-- particular instance of a name.  It is the rather unusual case for C++ that
+-- there may be several distinct functions that have the exact same demangled
+-- representation.  This can also happen if multiple entities with the same name
+-- in different scopes.  The Discriminator is used to identify which actual
+-- function is being referenced, even though it's not possible to tell which one
+-- based on the visible demangled name.
+newtype Discriminator = Discriminator Natural
+  deriving (Eq, Show)
 
 data ModuleName = ModuleName IsPartition SourceName
   deriving (Eq, Show)

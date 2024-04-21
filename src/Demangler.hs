@@ -611,10 +611,11 @@ function_encoding i = do e <- encoding i
                                      _ -> False
                          return e
 
-discriminator :: Next a Int
+discriminator :: Next a Discriminator
 discriminator = asum' [ match "_" >=> single_digit_num
                       , match "__" >=> digits_num >=> match "_"
                       ]
+                >=> rmap (Discriminator . toEnum)
 
 template_prefix_and_args :: AnyNext (TemplatePrefix, Maybe TemplateArgs)
 template_prefix_and_args =

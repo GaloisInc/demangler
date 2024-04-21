@@ -173,8 +173,16 @@ instance {-# OVERLAPPABLE #-}
       UnscopedName False uqn -> sayable @saytag $ WC uqn c
       UnscopedName True uqn -> t'"std::" &+ WC uqn c
       UnscopedTemplateName nn ta -> WC nn c &+ WC ta c
-      LocalName fs fe mbd -> WC fs c  &+ t'"::" &+ WC fe c &? wCtx mbd c -- ??
-      StringLitName fs mbd -> WC fs c &? wCtx mbd c -- ??
+      LocalName fs fe _discr -> WC fs c  &+ t'"::" &+ WC fe c -- Discriminators are invisible in demangled form
+      StringLitName fs _discr -> sayable @saytag $ WC fs c  -- Discriminators are invisible in demangled form
+
+
+-- Note: this should never actually be used, but the sayableConstraints template
+-- haskell production doesn't know that.
+instance Sayable saytag Discriminator where
+  sayable _ = sayable @saytag $ t'""
+instance Sayable saytag (WithContext Discriminator) where
+  sayable _ = sayable @saytag $ t'""
 
 
 instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext Coord) where

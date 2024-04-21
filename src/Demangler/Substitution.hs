@@ -46,6 +46,7 @@ import           Demangler.PPrint ()
 
 #ifdef MIN_VERSION_panic
 -- The debug flag is enabled in the cabal file
+import           Demangler.Context
 import           Text.Sayable
 import           Debug.Trace
 #endif
