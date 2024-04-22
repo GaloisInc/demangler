@@ -179,8 +179,7 @@ instance {-# OVERLAPPABLE #-}
   sayable wc =
     case contextData wc of
       NameNested nn -> sayable @saytag $ withContext wc nn
-      UnscopedName False uqn -> sayable @saytag $ withContext wc uqn
-      UnscopedName True uqn -> t'"std::" &+ withContext wc uqn
+      UnscopedName usn -> sayable @saytag $ withContext wc usn
       UnscopedTemplateName nn ta -> withContext wc nn &+ withContext wc ta
       LocalName fs fe _discr -> withContext wc fs &+ t'"::" &+ withContext wc fe -- Discriminators are invisible in demangled form
       StringLitName fs _discr -> sayable @saytag $ withContext wc fs  -- Discriminators are invisible in demangled form
@@ -192,6 +191,15 @@ instance Sayable saytag Discriminator where
   sayable _ = sayable @saytag $ t'""
 instance Sayable saytag (WithContext Discriminator) where
   sayable _ = sayable @saytag $ t'""
+
+instance {--# OVERLAPPABLE #-}
+  $(sayableConstraints ''UnscopedName
+   ) =>  Sayable saytag (WithContext UnscopedName) where
+  sayable wc =
+    case contextData wc of
+      UnScName False uqn -> sayable @saytag $ withContext wc uqn
+      UnScName True uqn -> t'"std::" &+ withContext wc uqn
+      UnScSubst subs -> sayable @saytag $ withContext wc subs
 
 
 instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext Coord) where

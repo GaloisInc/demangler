@@ -56,11 +56,14 @@ functionName (d,c) =
       EncData (LocalName enc _ _) -> getEnc enc
       o -> Nothing
     getName = \case
-      UnscopedName False uqn -> Just $ NEL.fromList $ getUQN uqn
-      UnscopedName True uqn -> Just $ NEL.fromList $ getUQN uqn <> ["std"]
+      UnscopedName usn -> getUSN usn
       UnscopedTemplateName nm _tmplArgs -> getName nm
       NameNested nnm -> getNestedNm nnm
       nm -> Just $ T.pack ( show nm ) :| []
+    getUSN = \case
+      UnScName False uqn -> Just $ NEL.fromList $ getUQN uqn
+      UnScName True uqn -> Just $ NEL.fromList $ getUQN uqn <> ["std"]
+      UnScSubst subs -> Just $ NEL.fromList $ getStdSubst subs
     getUQN = \case
       SourceName (SrcName i) _ -> [contextStr (addContext () c) i]
       OperatorName op _ ->
@@ -75,20 +78,21 @@ functionName (d,c) =
                             DeletingDtor -> ["{{DTOR}"]
                             CompleteDtor -> ["{{DTOR}"]
                             BaseDtor -> ["{{DTOR}"]
-      StdSubst sbst -> case sbst of
-                         SubStd -> ["std"]
-                         SubAlloc -> [ "allocator", "std" ]
-                         SubBasicString -> [ "basic_string", "std" ]
-                         SubStdType BasicStringChar -> [ "string", "std" ]
-                         SubStdType BasicIStream -> [ "istream", "std" ]
-                         SubStdType BasicOStream -> [ "ostream", "std" ]
-                         SubStdType BasicIOStream -> [ "iostream", "std" ]
+      StdSubst sbst -> getStdSubst sbst
       ModuleNamed _ uqn -> getUQN uqn
       UnnamedTypeName mbnum ->
         -- Highly unusual, and probably not ultimately useful.  This happens when
         -- an unnamed structure/union/class has a function.  For example,
         -- "_ZN3FooUt3_C2Ev" translates to "Foo::{unnamed type#5}::Foo()".
         let n = maybe 1 (+2) mbnum in [ T.pack $ "unnamed_type_num" <> show n ]
+    getStdSubst = \case
+      SubStd -> ["std"]
+      SubAlloc -> [ "allocator", "std" ]
+      SubBasicString -> [ "basic_string", "std" ]
+      SubStdType BasicStringChar -> [ "string", "std" ]
+      SubStdType BasicIStream -> [ "istream", "std" ]
+      SubStdType BasicOStream -> [ "ostream", "std" ]
+      SubStdType BasicIOStream -> [ "iostream", "std" ]
     getNestedNm = \case
       NestedName pfx uqn _ _ -> NEL.nonEmpty $ getUQN uqn <> getPfx pfx
       NestedTemplateName tmplpfx _tmplArgs _ _ -> NEL.nonEmpty $ getTmplPfx tmplpfx

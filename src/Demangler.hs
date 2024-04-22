@@ -151,7 +151,7 @@ name = asum' [ nested_name >=> rmap NameNested
              , unscoped_template_name >&=> template_args
                >=> rmap (uncurry UnscopedTemplateName)
              , local_name
-             , unscoped_name
+             , unscoped_name >=> rmap UnscopedName
              ]
 
 nested_name :: AnyNext NestedName
@@ -189,18 +189,16 @@ nested_name = match "N"
                      let (cvq, mb'refQual) = i ^. nVal
                      ret pa $ NestedTemplateName p a cvq mb'refQual
 
-unscoped_name :: AnyNext Name
+unscoped_name :: AnyNext UnscopedName
 unscoped_name =
-  asum' [ unqualified_name >=> rmap (UnscopedName False)
-        , match "St" >=> unqualified_name >=> rmap (UnscopedName True)
+  asum' [ unqualified_name >=> rmap (UnScName False)
+        , match "St" >=> unqualified_name >=> rmap (UnScName True)
         ]
 
 unscoped_template_name :: AnyNext Name
 unscoped_template_name i =
-  (unscoped_name i >>= canSubstUnscopedTemplateName)
-  <|> (substitution i
-        >>= substituteUnqualifiedName (rmap StdSubst)
-        >>= rmap (UnscopedName False)
+  (unscoped_name i >>= rmap UnscopedName >>= canSubstUnscopedTemplateName)
+  <|> (substitution i >>= (rmap UnscopedName <=< substituteUnscopedName (rmap UnScSubst))
       )
 
 
@@ -437,7 +435,7 @@ bare_function_type isStatic i =
      case i ^. nVal of
        FunctionName
          (UnscopedTemplateName
-           (UnscopedName _ (OperatorName (OpCast {}) _)) _) -> noRetType
+           (UnscopedName (UnScName _ (OperatorName (OpCast {}) _))) _) -> noRetType
        FunctionName (UnscopedTemplateName {}) -> withRetType
        FunctionName (NameNested (NestedTemplateName pr _ _ _)) ->
          case pr of

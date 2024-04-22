@@ -48,10 +48,14 @@ data FunctionName = FunctionName Name
   deriving (Eq, Show)
 
 data Name = NameNested NestedName
-          | UnscopedName Bool UnqualifiedName -- Bool is "std::" prefix
+          | UnscopedName UnscopedName
           | UnscopedTemplateName Name TemplateArgs
           | LocalName Encoding Name (Maybe Discriminator)
           | StringLitName Encoding (Maybe Discriminator)
+  deriving (Eq, Show)
+
+data UnscopedName = UnScName Bool UnqualifiedName -- Bool is "std::" prefix
+                  | UnScSubst Substitution
   deriving (Eq, Show)
 
 data NestedName = NestedName Prefix UnqualifiedName

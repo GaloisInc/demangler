@@ -60,3 +60,4 @@ bind`Functor
 method_wrapper`Functor
 sq
 ObjCallback`ObjCallback`Canard
+operator-=`complex`std

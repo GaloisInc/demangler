@@ -10,7 +10,7 @@ module Demangler.Substitution
     -- * Parse a substitution reference
     substitution
     -- * Substitute the found substitution into the result
-  , substituteUnqualifiedName
+  , substituteUnscopedName
   , substitutePrefix
   , substitutePrefixR
   , substituteTemplateParam
@@ -161,12 +161,30 @@ invalidSubst for spec = \case
          , show (spec ^. nVal)
          ]
 
-substituteUnqualifiedName :: Next Substitution UnqualifiedName
-                          -> Next Substitution' UnqualifiedName
-substituteUnqualifiedName direct i =
+substituteUnscopedName :: Next Substitution UnscopedName
+                          -> Next Substitution' UnscopedName
+substituteUnscopedName direct i =
   case getSubst i of
-    Right (Just (SC_UQName _ n)) -> ret i n
-    Right _ -> Nothing
+    Right (Just (SC_UQName s n)) -> ret i $ UnScName s n
+    Right (Just (SC_Prefix p)) ->
+      let getUsn = \case
+            Prefix prefixr -> getUsn_PR prefixr
+            _ -> Nothing
+          getUsn_PR = \case
+            PrefixUQName uqn PrefixEnd -> Just $ UnScName False uqn
+            PrefixUQName (StdSubst SubStd) sp ->
+              case getUsn_PR sp of
+                Nothing -> Nothing
+                Just (UnScName _ uqn) -> Just $ UnScName True uqn
+                Just n@(UnScSubst _) -> Just n
+            PrefixUQName (StdSubst _) _ -> Nothing
+            PrefixUQName _ _ -> Nothing
+            PrefixEnd -> Nothing
+            PrefixTemplateArgs _ _ -> Nothing
+      in case getUsn p of
+           Nothing -> Nothing
+           Just usn -> ret i usn
+    Right o -> Nothing
     Left s -> direct =<< ret i s
 
 substituteType :: (Next Substitution Type_) -> Next Substitution' Type_
@@ -175,7 +193,7 @@ substituteType embed i =
     Right (Just (SC_Type t)) -> ret i t
     Right (Just (SC_Prefix p)) -> ret i =<< prefixToType p
     Right (Just (SC_UQName isStd uqn)) ->
-      ret i $ ClassUnionStructEnum $ UnscopedName isStd uqn
+      ret i $ ClassUnionStructEnum $ UnscopedName $ UnScName isStd uqn
     Right o -> invalidSubst "Type" i o
     Left s -> embed =<< ret i s
 
@@ -230,9 +248,10 @@ substitutePrefixR direct i =
   where
     name2prefix = \case
       NameNested nn -> nn2prefix nn
-      UnscopedName True uqn -> Nothing
+      UnscopedName (UnScName True _uqn) -> Nothing
         -- Just $ PrefixUQName (SourceName (!!! "std") mempty) $ PrefixUQName uqn PrefixEnd
-      UnscopedName False uqn -> Just $ PrefixUQName uqn PrefixEnd
+      UnscopedName (UnScName False uqn) -> Just $ PrefixUQName uqn PrefixEnd
+      UnscopedName (UnScSubst s) -> Just $ PrefixUQName (StdSubst s) PrefixEnd
       UnscopedTemplateName nm _tmplArgs -> name2prefix nm
       LocalName _enc nm _disc -> name2prefix nm -- discriminators are invisible
       StringLitName _ _ -> Nothing
@@ -312,7 +331,7 @@ dropLastSubst i = pure $ i & nSubs %~ dropLast
 canSubstUnscopedTemplateName :: Next Name Name
 canSubstUnscopedTemplateName i =
   case i ^. nVal of
-    UnscopedName isStd uqn -> canSubst (SC_UQName isStd uqn) i
+    UnscopedName (UnScName isStd uqn) -> canSubst (SC_UQName isStd uqn) i
     _ -> pure i
 
 
