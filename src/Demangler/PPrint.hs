@@ -656,8 +656,8 @@ instance {-# OVERLAPPABLE #-}
       ClassStruct n -> sayable @saytag $ withContext wc n
       Union n -> sayable @saytag $ withContext wc n
       Enum n -> sayable @saytag $ withContext wc n
-      ty@(Function {}) -> sayFunctionType ty "" wc
-      Pointer f@(Function {}) -> sayFunctionType f "(*)" wc
+      ty@(Function {}) -> sayFunctionType ty (t'"") wc
+      Pointer f@(Function {}) -> sayFunctionType f (t'"(*)") wc
       Pointer (ArrayType bnd t) -> withContext wc t &- t'"(*)" &- '[' &+ withContext wc bnd &+ ']'
       Pointer t -> withContext wc t &+ '*'
       LValRef (ArrayType bnd t) -> withContext wc t &- t'"(&)" &- '[' &+ withContext wc bnd &+ ']'
@@ -678,9 +678,12 @@ instance {-# OVERLAPPABLE #-}
         ctxLst ts wc
       StdType stdTy -> sayable @saytag $ withContext wc stdTy
       DeclType_ dt -> sayable @saytag $ withContext wc dt
+      PointerToMember cty mty@(Function {}) ->
+        sayFunctionType mty ('(' &+ withContext wc cty &+ t'"::*)") wc
+      PointerToMember cty mty -> '(' &+ withContext wc cty &+ t'"::*)" &+ withContext wc mty -- ??
 
 
-sayFunctionType :: Type_ -> Text -> WithContext Type_ -> Saying saytag
+sayFunctionType :: Sayable saytag nm => Type_ -> nm -> WithContext Type_ -> Saying saytag
 sayFunctionType (Function cvqs mb'exc trns isExternC rTy argTys mb'ref) nm wc =
   ctxLst' cvqs wc " "
   &? wCtx mb'exc wc

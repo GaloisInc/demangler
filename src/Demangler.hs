@@ -487,7 +487,7 @@ type_parser =
         , asum' [ function_type
                 , class_enum_type
                 , array_type
-                  -- , pointer_to_member_type
+                , pointer_to_member_type
                 , template_template_param >&=> template_args
                   >=> rmap (uncurry Template)
                 , decltype >=> rmap DeclType_
@@ -611,6 +611,11 @@ array_type = match "A"
                        , expression >=> match "_" >&=> type_
                          >=> rmap (uncurry (ArrayType . ExprBound))
                        ]
+
+pointer_to_member_type :: AnyNext Type_
+pointer_to_member_type = match "M"
+                         >=> type_ >=> rmap PointerToMember
+                         >&=> type_ >=> rapply
 
 function_encoding :: AnyNext Encoding
 function_encoding i = do e <- encoding i

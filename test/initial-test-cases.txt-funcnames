@@ -59,3 +59,4 @@ init`AP_Logger
 bind`Functor
 method_wrapper`Functor
 sq
+ObjCallback`ObjCallback`Canard

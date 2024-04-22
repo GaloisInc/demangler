@@ -204,6 +204,7 @@ data Type_ = BaseType BaseType
            | StdType StdType
            | ArrayType ArrayBound Type_
            | DeclType_ DeclType
+           | PointerToMember Type_ Type_  -- class type, member type
   deriving (Eq, Show)
 
 data ArrayBound = NumBound Int
