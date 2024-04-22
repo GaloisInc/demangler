@@ -563,7 +563,7 @@ qualified_type i = do eQ <- many' extended_qualifier $ rdiscard i
                       ret tY $ QualifiedType (eQ ^. nVal) (cQ ^. nVal) (tY ^. nVal)
 
 extended_qualifier :: Next () ExtendedQualifier
-extended_qualifier = tbd "extended_qualifier"
+extended_qualifier = match "U" >=> tbd "extended_qualifier"
 
 function_type :: AnyNext Type_
 -- function_type = tbd "function_type"
