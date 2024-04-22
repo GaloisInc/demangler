@@ -29,7 +29,7 @@ import           Panic
 
 instance PanicComponent Demangler where
   panicComponentName _ = "Demangler"
-  panicComponentIssues = const "https://github.com/galoisinc/demangler/issues"
+  panicComponentIssues = const "https://github.com/GaloisInc/demangler/issues"
   panicComponentRevision _ = ("main", "-")
 
 cannot :: PanicComponent a => a -> String -> [String] -> b
