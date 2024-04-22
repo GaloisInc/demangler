@@ -107,6 +107,11 @@ instance {-# OVERLAPPABLE #-}
       -- Another tricky part is that the FunctionName may contain qualifiers
       -- (esp. "const") but for a function these must be placed at the end,
       -- following the arguments.
+      --
+      -- Additionally, if this function is being printed as part of a template
+      -- argument, then do not print the arguments.  This conforms to GCC c++filt
+      -- output, although llvm-cxxfilt *does* print the arguments, however, the
+      -- testing oracle is c++filt.
       EncFunc f rty (BaseType Void :| []) -> sayFunction wc f rty []
       EncFunc f rty t -> sayFunction wc f rty $ NEL.toList t
       -- n.b. static functions don't have any visible difference in demangled
@@ -124,7 +129,9 @@ sayFunction wc fn mbRet args =
       part1 = case mbRet of
                 Nothing -> withContext wc nm &+ t'""
                 Just rty -> withContext wc rty &- withContext wc nm
-      part2 = part1 &+ '(' &+ ctxLst args wc &+ ')'
+      part2 = if isTemplateArgContext wc
+              then part1
+              else part1 &+ '(' &+ ctxLst args wc &+ ')'
   in if null q then part2 else part2 &- ctxLst' q wc " "
 
 instance Sayable saytag (WithContext a)
@@ -407,9 +414,9 @@ instance {-# OVERLAPPABLE #-}
   ) => Sayable saytag (WithContext TemplateArg) where
   sayable wc =
     case contextData wc of
-      TArgType ty -> sayable @saytag $ withContext wc ty
-      TArgSimpleExpr ep -> sayable @saytag $ withContext wc ep
-      TArgExpr expr -> sayable @saytag $ withContext wc expr
+      TArgType ty -> sayable @saytag $ withContextForTemplateArg wc ty
+      TArgSimpleExpr ep -> sayable @saytag $ withContextForTemplateArg wc ep
+      TArgExpr expr -> sayable @saytag $ withContextForTemplateArg wc expr
       TArgPack tas ->
         -- Expected some ellipses (see
         -- https://en.cppreference.com/w/cpp/language/parameter-pack), but
@@ -420,7 +427,7 @@ instance {-# OVERLAPPABLE #-}
         --
         -- Do not simply defer to the TemplateArgs sayable because that will
         -- engender another pair of surrounding angle brackets.
-        ctxLst tas wc
+        ctxLst tas $ withContextForTemplateArg wc ()
 
 instance {-# OVERLAPPABLE #-}
   $(sayableConstraints ''Expression

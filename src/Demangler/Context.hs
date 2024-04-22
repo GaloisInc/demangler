@@ -10,6 +10,8 @@ module Demangler.Context
   , addContext
   , withContext
   , contextData
+  , withContextForTemplateArg
+  , isTemplateArgContext
   , sayableConstraints
   )
 where
@@ -50,18 +52,27 @@ contextFindOrAdd s c@(Context l) =
     Nothing -> (Seq.length l, Context $ l |> s)
 
 contextStr :: WithContext a -> Coord -> Text
-contextStr (WC _ (Context l)) i = l `Seq.index` i
+contextStr (WC _ _ (Context l)) i = l `Seq.index` i
 
-data WithContext a = WC a Context
+data SayingElement = DefaultSay | SayingTemplateArg
+
+data WithContext a = WC  SayingElement a Context
 
 addContext :: a -> Context -> WithContext a
-addContext = WC
+addContext = WC DefaultSay
 
 withContext :: WithContext a -> b -> WithContext b
-withContext (WC _ c) d = WC d c
+withContext (WC s _ c) d = WC s d c
+
+withContextForTemplateArg :: WithContext a -> b -> WithContext b
+withContextForTemplateArg (WC _ _ c) d = WC SayingTemplateArg d c
+
+isTemplateArgContext :: WithContext a -> Bool
+isTemplateArgContext (WC SayingTemplateArg _ _) = True
+isTemplateArgContext _ = False
 
 contextData :: WithContext a -> a
-contextData (WC d _) = d
+contextData (WC _ d _) = d
 
 sayableConstraints :: TH.Name -> TH.PredQ
 sayableConstraints forTy = do
