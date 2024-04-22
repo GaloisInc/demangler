@@ -388,7 +388,10 @@ instance {-# OVERLAPPABLE #-}
   (Sayable saytag (WithContext TemplateArg)
   ) => Sayable saytag (WithContext TemplateArgs) where
   sayable wc = let args = contextData wc
-               in '<' &+ ctxLst args wc &+ templateArgsEnd args
+                   args' = filter (not . emptyArgPack) $ NEL.toList args
+                   emptyArgPack (TArgPack []) = True
+                   emptyArgPack _ = False
+               in '<' &+ ctxLst args' wc &+ templateArgsEnd args
 
 -- C++ requires a space between template argument closures to resolve the parsing
 -- ambiguity between that and a right shift operation.(e.g. "list<foo<int> >"
