@@ -51,7 +51,8 @@ functionName (d,c) =
     getEnc = \case
       EncFunc (FunctionName fn) _rty _argtys -> getName fn
       EncStaticFunc (FunctionName fn) _rty _argtys -> getName fn
-      _ -> Nothing
+      EncData (LocalName enc _ _) -> getEnc enc
+      o -> Nothing
     getName = \case
       UnscopedName False uqn -> Just $ NEL.fromList $ getUQN uqn
       UnscopedName True uqn -> Just $ NEL.fromList $ getUQN uqn <> ["std"]
