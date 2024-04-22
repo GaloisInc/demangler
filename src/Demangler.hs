@@ -226,8 +226,8 @@ cv_qualifiers =
      >=> optional' (match "r") >=> ifPresent Restrict
 
 ref_qualifier :: AnyNext RefQualifier
-ref_qualifier = asum' [ match "&&" >=> rmap (const RefRef)
-                      , match "&" >=> rmap (const Ref)
+ref_qualifier = asum' [ match "O" >=> rmap (const RefRef)
+                      , match "R" >=> rmap (const Ref)
                       ]
 
 -- | Parse prefix.  This is a bit tricky though.  The BNF specifies:
