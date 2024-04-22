@@ -484,8 +484,7 @@ type_parser =
           rmap ((:|[]) . BaseType) <=< builtin_type
 
           -- Single element matches
-        , asum' [ qualified_type
-                , function_type
+        , asum' [ function_type
                 , class_enum_type
                 , array_type
                   -- , pointer_to_member_type
@@ -495,13 +494,14 @@ type_parser =
                 -- This one is tricky: it's recursive, but then binds the
                 -- (possibly) multiple returned recursion types into a single
                 -- type.
-                , match "Dp" >=> type_parser >=> rmap Cpp11PackExpansion
+                , match "Dp" >=> types_ >=> rmap Cpp11PackExpansion
                 ]
           >=> canSubstType
           >=> rmap (:|[])
 
           -- Possibly multiple element matches (either direct or via recursion)
-        , asum' [ match "P" >=> type_parser >=> rmap (fmap Pointer)
+        , asum' [ qualified_type
+                , match "P" >=> type_parser >=> rmap (fmap Pointer)
                 , match "R" >=> type_parser >=> rmap (fmap LValRef)
                 , match "O" >=> type_parser >=> rmap (fmap RValRef)
                 , match "C" >=> type_parser >=> rmap (fmap ComplexPair)
@@ -552,15 +552,19 @@ builtin_type =
           ]
      )
 
-qualified_type :: AnyNext Type_
+-- Returns potentially multiple types to support C++11 argument packs
+qualified_type :: AnyNext (NEL.NonEmpty Type_)
 qualified_type i = do eQ <- many' extended_qualifier $ rdiscard i
                       cQ <- cv_qualifiers eQ
                       -- Require some amount of production before recursion
                       require $ not $ and [ null $ cQ ^. nVal
                                           , null $ eQ ^. nVal
                                           ]
-                      tY <- type_ cQ
-                      ret tY $ QualifiedType (eQ ^. nVal) (cQ ^. nVal) (tY ^. nVal)
+                      tYs <- type_parser cQ
+                      let eQv = eQ ^. nVal
+                      let cQv = cQ ^. nVal
+                      let qTy = QualifiedType eQv cQv
+                      ret tYs (qTy <$> (tYs ^. nVal))
 
 extended_qualifier :: Next () ExtendedQualifier
 extended_qualifier = match "U" >=> tbd "extended_qualifier"
