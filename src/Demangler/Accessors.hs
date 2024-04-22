@@ -45,6 +45,8 @@ functionName (d,c) =
     VendorExtended e _ -> getEnc e
   where
     resolveCtorDtor = \case
+      ("{{CTOR}" :| r@(nm : nm2 : _)) | "unnamed_type_num" `T.isPrefixOf` nm -> nm2 :| r
+      ("{{DTOR}" :| r@(nm : nm2 : _)) | "unnamed_type_num" `T.isPrefixOf` nm -> "~" <> nm2 :| r
       ("{{CTOR}" :| r@(nm : _)) -> nm :| r
       ("{{DTOR}" :| r@(nm : _)) -> "~" <> nm :| r
       o -> o
@@ -82,8 +84,11 @@ functionName (d,c) =
                          SubStdType BasicOStream -> [ "ostream", "std" ]
                          SubStdType BasicIOStream -> [ "iostream", "std" ]
       ModuleNamed _ uqn -> getUQN uqn
-      UnnamedTypeName _ ->
-        [T.pack "<impossible: unnamed type name cannot be a function name>"]
+      UnnamedTypeName mbnum ->
+        -- Highly unusual, and probably not ultimately useful.  This happens when
+        -- an unnamed structure/union/class has a function.  For example,
+        -- "_ZN3FooUt3_C2Ev" translates to "Foo::{unnamed type#5}::Foo()".
+        let n = maybe 1 (+2) mbnum in [ T.pack $ "unnamed_type_num" <> show n ]
     getNestedNm = \case
       NestedName pfx uqn _ _ -> NEL.nonEmpty $ getUQN uqn <> getPfx pfx
       NestedTemplateName tmplpfx _tmplArgs _ _ -> NEL.nonEmpty $ getTmplPfx tmplpfx
