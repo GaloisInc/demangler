@@ -431,7 +431,7 @@ bare_function_type isStatic i =
                             Nothing ->
                               cannot Demangler "bare_function_type.withRetType"
                               [ "Function with rtype and no argtypes: "
-                              , sez @"error" (WC (i ^. nVal) (i ^. nContext))
+                              , sez @"error" (addContext (i ^. nVal) (i ^. nContext))
                               ]
      let noRetType = rmap (constr (i ^. nVal) Nothing) tys
      case i ^. nVal of
@@ -523,7 +523,7 @@ type_parser =
                                 in ret i =<< NEL.nonEmpty (each <$> tas)
                               o -> cannot Demangler "type_parser.template_param"
                                    [ "bad template param ref in type:"
-                                   , sez @"debug" (WC o (i ^. nContext))
+                                   , sez @"debug" (addContext o (i ^. nContext))
                                    , "raw: " <> show o
                                    ]
                       )

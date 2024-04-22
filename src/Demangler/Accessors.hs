@@ -40,7 +40,7 @@ import           Demangler.Structure
 functionName :: Result -> Maybe (NEL.NonEmpty Text)
 functionName (d,c) =
   case d of
-    Original i -> Just $ contextStr c i :| []
+    Original i -> Just $ contextStr (addContext () c) i :| []
     Encoded e -> resolveCtorDtor <$> getEnc e
     VendorExtended e _ -> getEnc e
   where
@@ -60,7 +60,7 @@ functionName (d,c) =
       NameNested nnm -> getNestedNm nnm
       nm -> Just $ T.pack ( show nm ) :| []
     getUQN = \case
-      SourceName (SrcName i) _ -> [contextStr c i]
+      SourceName (SrcName i) _ -> [contextStr (addContext () c) i]
       OperatorName op _ ->
         [maybe (T.pack $ show op) (("operator" <>) . snd . snd)
          $ lookup op opTable]

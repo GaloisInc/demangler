@@ -6,7 +6,10 @@ module Demangler.Context
   , newDemangling
   , contextFindOrAdd
   , contextStr
-  , WithContext(..)
+  , WithContext
+  , addContext
+  , withContext
+  , contextData
   , sayableConstraints
   )
 where
@@ -46,10 +49,19 @@ contextFindOrAdd s c@(Context l) =
     Just n -> (n, c)
     Nothing -> (Seq.length l, Context $ l |> s)
 
-contextStr :: Context -> Coord -> Text
-contextStr (Context l) i = l `Seq.index` i
+contextStr :: WithContext a -> Coord -> Text
+contextStr (WC _ (Context l)) i = l `Seq.index` i
 
 data WithContext a = WC a Context
+
+addContext :: a -> Context -> WithContext a
+addContext = WC
+
+withContext :: WithContext a -> b -> WithContext b
+withContext (WC _ c) d = WC d c
+
+contextData :: WithContext a -> a
+contextData (WC d _) = d
 
 sayableConstraints :: TH.Name -> TH.PredQ
 sayableConstraints forTy = do
