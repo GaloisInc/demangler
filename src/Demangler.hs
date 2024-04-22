@@ -859,7 +859,11 @@ initializer = match "pi" >=> many' expression . rdiscard >=> match "E"
 
 function_param :: AnyNext FunctionParam
 function_param = asum' [ match "fpT" >=> rmap (const FP_This)
-                       , match "fp" >=> tbd "function param"
+                       , match "fp" >=> cv_qualifiers >=> rmap FP_
+                         >=> match "_" >=> rmap ($ 1)
+                       , match "fp" >=> cv_qualifiers >=> rmap FP_
+                         >&=> (digits_num >=> rmap (toEnum . (+2)))
+                         >=> match "_" >=> rapply
                        , match "fL" >=> tbd "function param l"
                        ]
 

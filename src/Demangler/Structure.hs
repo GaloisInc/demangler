@@ -362,7 +362,7 @@ data InitializerExpr = Initializer [Expression]
   deriving (Eq, Show)
 
 data FunctionParam = FP_This
-                   | FP_ Type_ -- XXX TBD
+                   | FP_ [CVQualifier] Natural
   deriving (Eq, Show)
 
 data UnresolvedName = URN_Base GlobalScope BaseUnresolvedName
