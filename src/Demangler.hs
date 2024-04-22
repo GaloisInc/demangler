@@ -728,16 +728,15 @@ template_param =
 
 expression :: AnyNext Expression
 expression =
-  let opMatch (o,(a,(t,_))) i = do m <- match t i
-                                   e1 <- expression m
-                                   case a of
-                                     Unary -> rmap (ExprUnary o) e1
-                                     Binary -> rmap (ExprBinary o) e1
-                                               >>= expression
-                                     Trinary -> rmap (ExprTrinary o) e1
-                                                >>= expression
-                                                >>= expression
-                                     _ -> Nothing
+  let opMatch (o,(Unary,(t,_))) = match t >=> expression >=> rmap (ExprUnary o)
+      opMatch (o,(Binary,(t,_))) = match t >=> expression
+                                   >=> rmap (ExprBinary o) >&=> expression
+                                   >=> rapply
+      opMatch (o,(Trinary,(t,_))) = match t >=> expression
+                                    >=> rmap (ExprTrinary o) >&=> expression
+                                    >=> rapply >&=> expression
+                                    >=> rapply
+      opMatch _ = const Nothing
       binary_op = operator_name
                   >=> \i -> case lookup (i^.nVal) opTable of
                               Just (Binary, _) -> pure i

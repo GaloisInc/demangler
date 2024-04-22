@@ -426,7 +426,7 @@ instance {-# OVERLAPPABLE #-}
       ExprUnary op expr -> WC op c &+ WC expr c
       ExprBinary op expr1 expr2 -> WC expr1 c &+ WC op c &+ WC expr2 c
       ExprTrinary op expr1 expr2 expr3 ->
-        WC expr1 c &- WC op c &- WC expr2 c &- ':' &- WC expr3 c
+        '(' &+ WC expr1 c &+ ')' &+ WC op c &+ WC expr2 c &- ':' &- WC expr3 c
       ExprPfxPlus expr -> t'"++" &+ WC expr c
       ExprPfxMinus expr -> t'"--" &+ WC expr c
       ExprCall (exprc :| args) -> WC exprc c &+ '(' &+ ctxLst args c &+ ')'
@@ -593,8 +593,8 @@ instance {-# OVERLAPPABLE #-}
    ) => Sayable saytag (WithContext DeclType) where
   sayable (WC dt c) =
     case dt of
-      DeclType expr -> t'"decltype(" &+ WC expr c &+ ')'
-      DeclTypeExpr expr -> t'"decltype(" &+ WC expr c &+ ')'
+      DeclType expr -> t'"decltype (" &+ WC expr c &+ ')'
+      DeclTypeExpr expr -> t'"decltype (" &+ WC expr c &+ ')'
 
 
 instance {-# OVERLAPPABLE #-} Sayable saytag (WithContext ClosurePrefix) where
