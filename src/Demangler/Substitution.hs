@@ -220,11 +220,29 @@ substitutePrefix direct i =
 substitutePrefixR :: Next Substitution PrefixR -> Next Substitution' PrefixR
 substitutePrefixR direct i =
   case getSubst i of
-    Right (Just (SC_Type (ClassUnionStructEnum (UnscopedName False uqn)))) ->
-      ret i $ PrefixUQName uqn PrefixEnd
+    Right o@(Just (SC_Type (ClassUnionStructEnum nm))) ->
+      case name2prefix nm of
+        Just pfx -> ret i pfx
+        Nothing -> invalidSubst "PrefixR.SC_Type.ClassUnionStructEnum" i o
     Right (Just (SC_Prefix (Prefix sp))) -> ret i sp
     Right o -> invalidSubst "PrefixR" i o
     Left s -> ret i s >>= direct
+  where
+    name2prefix = \case
+      NameNested nn -> nn2prefix nn
+      UnscopedName True uqn -> Nothing
+        -- Just $ PrefixUQName (SourceName (!!! "std") mempty) $ PrefixUQName uqn PrefixEnd
+      UnscopedName False uqn -> Just $ PrefixUQName uqn PrefixEnd
+      UnscopedTemplateName nm _tmplArgs -> name2prefix nm
+      LocalName _enc nm _disc -> name2prefix nm -- discriminators are invisible
+      StringLitName _ _ -> Nothing
+    nn2prefix = \case
+      NestedName pf@(Prefix _) uqn _cvq _mbref ->
+        case extendPrefix pf $ PrefixUQName uqn PrefixEnd of
+          Prefix pfr -> Just pfr
+          _ -> Nothing
+      o -> Nothing
+
 
 substituteTemplatePrefix :: (Next Substitution TemplatePrefix)
                          -> Next Substitution' TemplatePrefix
