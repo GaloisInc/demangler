@@ -61,3 +61,4 @@ method_wrapper`Functor
 sq
 ObjCallback`ObjCallback`Canard
 operator-=`complex`std
+stale`TelemetryData`AP_ESC_Telem_Backend

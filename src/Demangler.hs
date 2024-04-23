@@ -219,9 +219,9 @@ cv_qualifiers :: AnyNext [CVQualifier]
 cv_qualifiers =
   let ifPresent v i = rmap (\(a,p) -> if isJust p then v:a else a) i
   in insert []
-     >=> optional' (match "K") >=> ifPresent Const_
-     >=> optional' (match "V") >=> ifPresent Volatile
      >=> optional' (match "r") >=> ifPresent Restrict
+     >=> optional' (match "V") >=> ifPresent Volatile
+     >=> optional' (match "K") >=> ifPresent Const_
 
 ref_qualifier :: AnyNext RefQualifier
 ref_qualifier = asum' [ match "O" >=> rmap (const RefRef)
