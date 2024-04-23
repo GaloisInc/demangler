@@ -184,7 +184,7 @@ substituteUnscopedName direct i =
       in case getUsn p of
            Nothing -> Nothing
            Just usn -> ret i usn
-    Right o -> Nothing
+    Right _ -> Nothing
     Left s -> direct =<< ret i s
 
 substituteType :: (Next Substitution Type_) -> Next Substitution' Type_
@@ -260,7 +260,7 @@ substitutePrefixR direct i =
         case extendPrefix pf $ PrefixUQName uqn PrefixEnd of
           Prefix pfr -> Just pfr
           _ -> Nothing
-      o -> Nothing
+      _ -> Nothing
 
 
 substituteTemplatePrefix :: (Next Substitution TemplatePrefix)

@@ -54,7 +54,7 @@ functionName (d,c) =
       EncFunc (FunctionName fn) _rty _argtys -> getName fn
       EncStaticFunc (FunctionName fn) _rty _argtys -> getName fn
       EncData (LocalName enc _ _) -> getEnc enc
-      o -> Nothing
+      _ -> Nothing
     getName = \case
       UnscopedName usn -> getUSN usn
       UnscopedTemplateName nm _tmplArgs -> getName nm

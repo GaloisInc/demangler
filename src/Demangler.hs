@@ -568,7 +568,6 @@ extended_qualifier :: Next () ExtendedQualifier
 extended_qualifier = match "U" >=> tbd "extended_qualifier"
 
 function_type :: AnyNext Type_
--- function_type = tbd "function_type"
 function_type i = do f0 <- cv_qualifiers i
                            >>= optional' exception_spec
                            >>= optional' (match "Dx")
