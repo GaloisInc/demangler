@@ -25,7 +25,11 @@ import           Demangler.Structure
 -- necessarily unique.  The parent names have any template information removed as
 -- well. For example:
 --
--- @std::map<int, char>::insert(...)@ returns @"insert" :| [ "map", "std" ]@
+-- > std::map<int, char>::insert(...)
+--
+-- returns:
+--
+-- > "insert" :| [ "map", "std" ]
 --
 -- The reason for the reversed form is that the base name is usually the most
 -- relevant, and the parent information can be optionally consumed (and lazily

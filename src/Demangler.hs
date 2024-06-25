@@ -13,6 +13,18 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{- |
+   Provides a demangler (and mangler) for C++ names, with an intermediate
+   representation that captures the nuances of each composite name to allow
+   for semantic utilization of different portions of a name.
+   .
+   Also provides text sharing for efficient storage of a large number of
+   demangled names.
+   .
+   See https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling for more
+   details on mangling
+-}
+
 module Demangler
   (
     Context
@@ -56,11 +68,24 @@ import           Debug.Trace
 
 -- | Demangle a single entry.  If there are multiple entries to be demangled, use
 -- 'demangle' for efficient batching and memory reduction.
+--
+-- The 'Result' type is comprised of the 'Demangled' data value and the
+-- associated updated 'Context', both of which are deliberately opaque.  There
+-- are a few things you can do with a 'Result':
+--
+--  1. Convert the 'Result' to a human-readable format using the 'Sayable' class
+--     (see 'Text.Sayable').
+--
+--  2. Extract function name information from it via 'functionName'.
 
 demangle1 :: Text -> Result
 demangle1 s = demangle s newDemangling
 
+
 -- | Demangle an input string, given a Context for demangling.
+--
+-- Convert the 'Result' to a human-readable format using the 'Sayable' class (see
+-- 'Text.Sayable').
 --
 -- The signature of this function makes it ideal for State evaluation.
 

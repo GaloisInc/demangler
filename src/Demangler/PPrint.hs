@@ -14,6 +14,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-- OPTIONS_GHC -ddump-splices #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Demangler.PPrint () where
 

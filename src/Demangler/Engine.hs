@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 -- | This is an internal module that provides the core parsing engine
 -- functionality for the Demangler.
@@ -41,6 +42,10 @@ cannot _ _ _ = Nothing  -- signals a parsing failure, ultimately resulting in Or
 
 data Demangler = Demangler
 
+
+-- | This is the result of a demangling operation.  This provides the 'Demangled'
+-- result, along with the updated 'Context'.  Note that this structure is aligned
+-- with the result of the 'runState' monad.
 
 type Result = (Demangled, Context)
 

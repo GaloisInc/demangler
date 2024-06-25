@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Demangler.Structure
 where
