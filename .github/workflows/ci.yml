@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ghc_range: [ "", ":old", ":recent", ":ancient" ]
     steps:
       - uses: actions/checkout@v3
       - uses: cachix/install-nix-action@v20
@@ -20,4 +23,5 @@ jobs:
           authToken: '${{ secrets.CACHIX_WHAT4 }}'
       - name: build ${{ matrix.ghc-version }}
         shell: bash
-        run: nix run github:galoisinc/eng dev nixbuild_all
+        # n.b. cannot build all versions at once: exceeds github runner disk space
+        run: nix run github:galoisinc/eng dev nixbuild${{ matrix.ghc_range }}

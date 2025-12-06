@@ -17,14 +17,26 @@ dev
         in dir = {TopDir}
         exec = nix flake update --option tarball-ttl 60 nixpkgs levers sayable
 
-   nixbuild_all =
-     Uses nix to build versions 8.10 through 9.12
+   nixbuild:ancient =
+     Uses nix to build versions 8.10 through 9.2
+       note = not part of nixbuild:old because 8.10 through 9.6 will exceed
+              the available disk space for a github CI runner
+       in dir = {TopDir}
        exec =
-         for X in 810 90 92 ; do
-           echo :::: ghc$X
-           nix build --no-link .#demangler.ghc$X --override-input nixpkgs github:nixos/nixpkgs/25.05
-         done
-         for X in 94 96 98 910 912 ; do
-           echo :::: ghc$X
-           nix build --no-link .#demangler.ghc$X
-         done
+         nix build --no-link --override-input nixpkgs github:nixos/nixpkgs/25.05  .#demangler.ghc810 .#demangler.ghc90 .#demangler.ghc92
+   nixbuild:old =
+     Uses nix to build versions 8.10 through 9.6
+       in dir = {TopDir}
+       exec = nix build --no-link .#demangler.ghc94 .#demangler.ghc96
+   nixbuild:recent =
+     Uses nix to build versions 9.8 through 9.10
+       in dir = {TopDir}
+       exec = nix build --no-link .#demangler.ghc98 .#demangler.ghc910
+   nixbuild:all =
+     Uses nix to build versions 8.10 through 9.12
+       needs = nixbuild:old nixbuild:recent nixbuild
+       exec = echo All nix builds completed
+   nixbuild =
+     Uses nix to build default version
+       in dir = {TopDir}
+       exec = nix build --no-link .#demangler.ghc912
