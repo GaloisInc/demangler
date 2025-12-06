@@ -1,0 +1,7 @@
+
+doc
+  README
+    type = Overview
+    title = README
+    abstract = Description of the demangler library
+    location = ./README.org

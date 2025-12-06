@@ -1,0 +1,30 @@
+dev
+ subcmd
+   build
+     Builds the demangler library
+       exec = cabal build demangler demangle
+   test
+     testcase
+       demangler-test
+         type = EXE
+         runner = cabal_test
+     testrunner
+       cabal_test
+         exec = cabal test {TestName}
+
+   flake_update =
+      Update flake dependencies =
+        in dir = {TopDir}
+        exec = nix flake update --option tarball-ttl 60 nixpkgs levers sayable
+
+   nixbuild_all =
+     Uses nix to build versions 8.10 through 9.12
+       exec =
+         for X in 810 90 92 ; do
+           echo :::: ghc$X
+           nix build --no-link .#demangler.ghc$X --override-input nixpkgs github:nixos/nixpkgs/25.05
+         done
+         for X in 94 96 98 910 912 ; do
+           echo :::: ghc$X
+           nix build --no-link .#demangler.ghc$X
+         done
