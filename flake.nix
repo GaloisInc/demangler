@@ -33,10 +33,9 @@
           { inherit nixpkgs;
             flake = self;
             defaultPkg = "demangler";
-            # additionalPackages = pkgs: [ pkgs.? ];
           };
 
-        packages = levers.eachSystem (system:  # KWQ: add taphRep
+        packages = levers.eachSystem (system:
           let mkHaskell = levers.mkHaskellPkg { inherit nixpkgs system; };
               pkgs = import nixpkgs { inherit system; };
           in rec
