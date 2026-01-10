@@ -15,7 +15,7 @@ dev
    flake_update =
       Update flake dependencies =
         in dir = {TopDir}
-        exec = nix flake update --option tarball-ttl 60 nixpkgs levers sayable
+        exec = nix flake update --option tarball-ttl 60
 
    nixbuild:ancient =
      Uses nix to build versions 8.10 through 9.2
@@ -25,18 +25,18 @@ dev
        exec =
          nix build --no-link --override-input nixpkgs github:nixos/nixpkgs/25.05  .#demangler.ghc810 .#demangler.ghc90 .#demangler.ghc92
    nixbuild:old =
-     Uses nix to build versions 8.10 through 9.6
+     Uses nix to build with old GHC versions
        in dir = {TopDir}
        exec = nix build --no-link .#demangler.ghc94 .#demangler.ghc96
    nixbuild:recent =
-     Uses nix to build versions 9.8 through 9.10
+     Uses nix to build with recent GHC versions
        in dir = {TopDir}
        exec = nix build --no-link .#demangler.ghc98 .#demangler.ghc910
    nixbuild:all =
-     Uses nix to build versions 8.10 through 9.12
+     Uses nix to build with all supported GHC versions =
        needs = nixbuild:old nixbuild:recent nixbuild
        exec = echo All nix builds completed
    nixbuild =
-     Uses nix to build default version
+     Uses nix to build with current GHC versions
        in dir = {TopDir}
        exec = nix build --no-link .#demangler.ghc912
