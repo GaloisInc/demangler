@@ -97,6 +97,7 @@ test-suite demangler-test
     main-is:          Test.hs
     build-depends:    base
                     , demangler
+                    , directory
                     , hspec >= 2.9 && < 2.12
                     , prettyprinter
                     , process >= 1.6 && < 1.7
