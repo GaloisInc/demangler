@@ -22,6 +22,7 @@
         apps = levers.eachSystem (s:
           rec
           {
+            depmgr = levers.apps.${s}.depmgr;
             demangle = {
               type = "app";
               program = "${self.packages.${s}.demangler}/bin/demangle";
@@ -36,7 +37,9 @@
           };
 
         packages = levers.eachSystem (system:
-          let mkHaskell = levers.mkHaskellPkg { inherit nixpkgs system; };
+          let mkHaskell = levers.mkHaskellPkg { inherit nixpkgs system;
+                                                nix-deriv-srcs = "${self}/nix";
+                                              };
               pkgs = import nixpkgs { inherit system; };
           in rec
             {
